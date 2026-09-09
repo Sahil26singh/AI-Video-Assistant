@@ -1,5 +1,7 @@
 # 🎬 AI Video Assistant
 
+> **AI-powered Meeting Intelligence & Video Assistant** — Transcribe, Summarise & Chat with your Meetings.
+
 An end-to-end AI-powered meeting intelligence system that transcribes YouTube videos or local audio/video files, auto-generates structured summaries & action items, and lets you **Chat with your Meeting** using Retrieval-Augmented Generation (RAG).
 
 ---
