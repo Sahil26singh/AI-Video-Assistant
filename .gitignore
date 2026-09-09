@@ -1,0 +1,17 @@
+# Environment & Secrets
+.env
+.venv/
+
+# Cache & Compiled Files
+__pycache__/
+*.pyc
+core/__pycache__/
+utils/__pycache__/
+
+# Local Data & Media
+downloades/
+vector_db/
+
+# IDE
+.vscode/
+.idea/
