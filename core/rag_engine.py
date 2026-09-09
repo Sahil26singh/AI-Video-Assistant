@@ -40,33 +40,33 @@ def build_rag_chain(transcript:str):
 
     llm = get_llm()
 
-    prompt = ChatPromptTemplate.from_messages(
+    prompt_template = """You are an intelligent, helpful AI Video & Meeting Assistant.
+Your goal is to provide clear, insightful, and comprehensive answers to the user's question based on the provided meeting/video transcript context.
 
-        [(
-            "system",
-            """You are an expert meeting assistant. Answer the user's question 
-based ONLY on the meeting transcript context provided below.
-
-If the answer is not found in the context, say: 
-"I could not find this information in the meeting transcript."
-
-Always be concise and precise. If quoting someone, mention it clearly.
+Guidelines:
+1. **Synthesize & Explain**: Provide a well-structured, natural, and informative response. If the user types a keyword or topic (e.g., "dream", "libro"), summarize how that topic is discussed in the transcript, providing key details and surrounding context rather than just a single raw quote.
+2. **Clear Formatting**: Use clean formatting, bold text, and bullet points where appropriate to make the output easy to read.
+3. **Factual Accuracy**: Base your response strictly on the information present in the transcript context. Do not invent details not present in the context.
+4. **Fallback**: If the query is completely unrelated or not found in the context, politely state:
+"I could not find information regarding your query in the meeting transcript."
 
 Context from meeting transcript:
-{context}""",
-        ),
+{context}"""
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", prompt_template),
         ("human", "{question}"),
-    ]
-    )
+    ])
 
-    #full LCEL Rag pipeline 
-
+    # full LCEL RAG pipeline 
     rag_chain = (
-
-        {"context" : retriever | RunnableLambda(format_docs),
-         "question": RunnablePassthrough()
-         }
-         |prompt|llm|StrOutputParser()
+        {
+            "context": retriever | RunnableLambda(format_docs),
+            "question": RunnablePassthrough(),
+        }
+        | prompt
+        | llm
+        | StrOutputParser()
     )
 
     return rag_chain
@@ -74,29 +74,30 @@ Context from meeting transcript:
 
 def load_rag_chain():
     vector_store = load_vector_store()
-    retriver = get_retriever()
+    retriever = get_retriever(vector_store)
 
     llm = get_llm()
-    prompt = ChatPromptTemplate.from_messages([
-        (
-            "system",
-            """You are an expert meeting assistant. Answer the user's question 
-based ONLY on the meeting transcript context provided below.
+    prompt_template = """You are an intelligent, helpful AI Video & Meeting Assistant.
+Your goal is to provide clear, insightful, and comprehensive answers to the user's question based on the provided meeting/video transcript context.
 
-If the answer is not found in the context, say: 
-"I could not find this information in the meeting transcript."
-
-Always be concise and precise. If quoting someone, mention it clearly.
+Guidelines:
+1. **Synthesize & Explain**: Provide a well-structured, natural, and informative response. If the user types a keyword or topic (e.g., "dream", "libro"), summarize how that topic is discussed in the transcript, providing key details and surrounding context rather than just a single raw quote.
+2. **Clear Formatting**: Use clean formatting, bold text, and bullet points where appropriate to make the output easy to read.
+3. **Factual Accuracy**: Base your response strictly on the information present in the transcript context. Do not invent details not present in the context.
+4. **Fallback**: If the query is completely unrelated or not found in the context, politely state:
+"I could not find information regarding your query in the meeting transcript."
 
 Context from meeting transcript:
-{context}""",
-        ),
+{context}"""
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", prompt_template),
         ("human", "{question}"),
     ])
 
     rag_chain = (
         {
-            "context":  retriver| RunnableLambda(format_docs),
+            "context": retriever | RunnableLambda(format_docs),
             "question": RunnablePassthrough(),
         }
         | prompt
