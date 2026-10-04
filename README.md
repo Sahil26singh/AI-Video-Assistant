@@ -1,6 +1,6 @@
 # AI Video Assistant
 
-AI Video Assistant is a Python tool that transcribes, analyzes, and indexes video and audio content for interactive retrieval-augmented generation (RAG) chat. It supports both public YouTube URLs and local media uploads, offering dual speech-to-text backends (Groq Whisper for global audio and Sarvam AI for Hindi/Hinglish speech).
+> **AI-powered Meeting & Video Assistant** that transcribes YouTube videos or local media (Whisper / Sarvam AI), generates structured summaries & action items, and features interactive RAG chat (ChromaDB + Groq/Mistral). Includes Streamlit Web UI and CLI.
 
 ---
 
