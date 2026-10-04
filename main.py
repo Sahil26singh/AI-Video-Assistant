@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from utils.audio_processor import process_input
 from core.transcriber import transcribe_all
 from core.summarizer import summarize, generate_title
-from core.extractor import extract_action_items, extract_key_decisions, extract_questions
+from core.extractor import extract_all
 from core.rag_engine import build_rag_chain, ask_question
 
 
@@ -11,7 +11,7 @@ load_dotenv()
 def run_pipeline(source :str, language :str = "english") -> dict:
     print("starting AI Video Assistant")
 
-    chunks = process_input(source)
+    chunks, duration_sec = process_input(source)
 
     transcript = transcribe_all(chunks,language)
     print(f"raw transcription (first 300 characters ) {transcript[:300]}")
@@ -20,10 +20,10 @@ def run_pipeline(source :str, language :str = "english") -> dict:
 
     summary = summarize(transcript)
 
-    action_item = extract_action_items(transcript)
-
-    decisions = extract_key_decisions(transcript)
-    questions = extract_questions(transcript)
+    extracted = extract_all(transcript)
+    action_item = extracted["action_items"]
+    decisions = extracted["key_decisions"]
+    questions = extracted["open_questions"]
     
     rag_chain = build_rag_chain(transcript)
 
@@ -44,22 +44,25 @@ if __name__ == "__main__":
     result = run_pipeline(source, language)
 
     print("\n" + "=" * 60)
-    print(f"📌 Title: {result['title']}")
-    print(f"\n📋 Summary:\n{result['summary']}")
-    print(f"\n✅ Action Items:\n{result['action_items']}")
-    print(f"\n🔑 Key Decisions:\n{result['key_decisions']}")
-    print(f"\n❓ Open Questions:\n{result['open_questions']}")
+    print(f"Title: {result['title']}")
+    print(f"\nSummary:\n{result['summary']}")
+    print(f"\nAction Items:\n{result['action_items']}")
+    print(f"\nKey Takeaways:\n{result['key_decisions']}")
+    print(f"\nOpen Questions:\n{result['open_questions']}")
     print("=" * 60)
 
-    # Phase 2 — Chat with your meeting via RAG
-    print("\n💬 Chat with your meeting (type 'exit' to quit)\n")
+    # Phase 2 — Chat with your video via RAG
+    print("\nChat with your video (type 'exit' to quit)\n")
     rag_chain = result["rag_chain"]
-    while True:
-        question = input("You: ").strip()
-        if question.lower() in ["exit", "quit", "q"]:
-            print("👋 Goodbye!")
-            break
-        if not question:
-            continue
-        answer = ask_question(rag_chain, question)
-        print(f"\n🤖 Assistant: {answer}\n")
+    try:
+        while True:
+            question = input("You: ").strip()
+            if question.lower() in ["exit", "quit", "q"]:
+                print("Goodbye!")
+                break
+            if not question:
+                continue
+            answer = ask_question(rag_chain, question)
+            print(f"\nAssistant: {answer}\n")
+    except (KeyboardInterrupt, EOFError):
+        print("\nGoodbye!")

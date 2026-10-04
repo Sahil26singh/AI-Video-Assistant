@@ -40,7 +40,7 @@ def safe_invoke(chain, input_data, retries=5, delay=3):
         except Exception as e:
             if "429" in str(e) or "rate_limited" in str(e).lower():
                 wait = delay * (2 ** attempt)
-                print(f"⚠️ Mistral Rate limit reached. Retrying in {wait}s... (Attempt {attempt+1}/{retries})")
+                print(f"Rate limit reached. Retrying in {wait}s... (Attempt {attempt+1}/{retries})")
                 time.sleep(wait)
             else:
                 raise e
@@ -51,7 +51,7 @@ def summarize(transcript: str) -> str:
     llm = get_llm()
 
     map_prompt = ChatPromptTemplate.from_messages([
-        ("system", "Summarize this portion of a meeting transcript concisely."),
+        ("system", "Summarize this portion of the video transcript concisely."),
         ("human", "{text}"),
     ])
 
@@ -70,8 +70,8 @@ def summarize(transcript: str) -> str:
     combined_prompt = ChatPromptTemplate.from_messages([
         (
             "system",
-            "You are an expert meeting summarizer. Combine these partial summaries "
-            "into one final professional meeting summary in bullet points.",
+            "You are an expert video content summarizer. Combine these partial summaries "
+            "into one final professional video summary in structured bullet points.",
         ),
         ("human", "{text}"),
     ])
@@ -88,7 +88,7 @@ def generate_title(transcript: str) -> str:
         ChatPromptTemplate.from_messages([
             (
                 "system",
-                "Based on the meeting transcript, generate a short professional meeting title "
+                "Based on the video transcript, generate a short, descriptive, professional video title "
                 "(max 8 words). Only return the title, nothing else.",
             ),
             ("human", "{text}"),

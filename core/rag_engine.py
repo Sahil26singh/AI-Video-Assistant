@@ -1,14 +1,32 @@
 import os
+import time
 from langchain_mistralai import ChatMistralAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
-from core.vector_store import build_vector_store, load_vector_store, get_retriever
+from core.vector_store import build_vector_store, get_retriever
 
 from dotenv import load_dotenv
 load_dotenv()
 
 from langchain_groq import ChatGroq
+
+RAG_SYSTEM_PROMPT = """You are an intelligent, helpful AI Video Assistant.
+Your goal is to give clear, insightful, and comprehensive answers to the user's question using the provided video transcript context.
+
+Guidelines:
+1. **Synthesize & Explain**: Give a well-structured, natural, and informative response. If the user types a keyword or topic (e.g., "dream", "libro"), summarize how that topic is discussed in the video, with key details and surrounding context, not just a single raw quote.
+2. **Clear Formatting**: Use clean formatting, bold text, and bullet points where appropriate.
+3. **Transcript First**: Start from what the video actually says. Never present your own added knowledge as something the video said.
+4. **Relevance Handling**:
+   - **Directly covered**: Answer fully from the video transcript.
+   - **Partially or loosely related** (the video touches the topic, mentions it briefly, or covers only part of the question): First give what the video says. Then fill the gaps with accurate general knowledge to give a complete answer. Put the added part under a separate heading such as "**Additional context (not from the video):**" so the user can tell the two apart.
+   - **Completely unrelated** (nothing in the transcript connects to the question): Reply only with:
+     "I could not find information regarding your query in the video transcript."
+
+Context from video transcript:
+{context}"""
+
 
 def get_llm(temperature=0.3):
     groq_key = os.getenv("GROQ_API_KEY")
@@ -26,35 +44,21 @@ def get_llm(temperature=0.3):
         timeout=120,
     )
 
+
 def format_docs(docs):
     print(f"\n--- DEBUG: Retrieved {len(docs)} Chunks ---")
     for i, doc in enumerate(docs):
         print(f"[{i}]: {doc.page_content[:100]}...")
     return "\n\n".join([doc.page_content for doc in docs])
 
-def build_rag_chain(transcript:str):
 
+def build_rag_chain(transcript: str):
     vector_store = build_vector_store(transcript)
-
-    retriever = get_retriever(vector_store, k = 4)
-
+    retriever = get_retriever(vector_store, k=4)
     llm = get_llm()
 
-    prompt_template = """You are an intelligent, helpful AI Video & Meeting Assistant.
-Your goal is to provide clear, insightful, and comprehensive answers to the user's question based on the provided meeting/video transcript context.
-
-Guidelines:
-1. **Synthesize & Explain**: Provide a well-structured, natural, and informative response. If the user types a keyword or topic (e.g., "dream", "libro"), summarize how that topic is discussed in the transcript, providing key details and surrounding context rather than just a single raw quote.
-2. **Clear Formatting**: Use clean formatting, bold text, and bullet points where appropriate to make the output easy to read.
-3. **Factual Accuracy**: Base your response strictly on the information present in the transcript context. Do not invent details not present in the context.
-4. **Fallback**: If the query is completely unrelated or not found in the context, politely state:
-"I could not find information regarding your query in the meeting transcript."
-
-Context from meeting transcript:
-{context}"""
-
     prompt = ChatPromptTemplate.from_messages([
-        ("system", prompt_template),
+        ("system", RAG_SYSTEM_PROMPT),
         ("human", "{question}"),
     ])
 
@@ -72,44 +76,7 @@ Context from meeting transcript:
     return rag_chain
 
 
-def load_rag_chain():
-    vector_store = load_vector_store()
-    retriever = get_retriever(vector_store)
-
-    llm = get_llm()
-    prompt_template = """You are an intelligent, helpful AI Video & Meeting Assistant.
-Your goal is to provide clear, insightful, and comprehensive answers to the user's question based on the provided meeting/video transcript context.
-
-Guidelines:
-1. **Synthesize & Explain**: Provide a well-structured, natural, and informative response. If the user types a keyword or topic (e.g., "dream", "libro"), summarize how that topic is discussed in the transcript, providing key details and surrounding context rather than just a single raw quote.
-2. **Clear Formatting**: Use clean formatting, bold text, and bullet points where appropriate to make the output easy to read.
-3. **Factual Accuracy**: Base your response strictly on the information present in the transcript context. Do not invent details not present in the context.
-4. **Fallback**: If the query is completely unrelated or not found in the context, politely state:
-"I could not find information regarding your query in the meeting transcript."
-
-Context from meeting transcript:
-{context}"""
-
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", prompt_template),
-        ("human", "{question}"),
-    ])
-
-    rag_chain = (
-        {
-            "context": retriever | RunnableLambda(format_docs),
-            "question": RunnablePassthrough(),
-        }
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
-
-    return rag_chain
-
-
 def ask_question(rag_chain, question: str) -> str:
-    import time
     print(f"Question : {question}")
     for attempt in range(5):
         try:
@@ -119,7 +86,7 @@ def ask_question(rag_chain, question: str) -> str:
         except Exception as e:
             if "429" in str(e) or "rate_limited" in str(e).lower():
                 wait = 3 * (2 ** attempt)
-                print(f"⚠️ Mistral Rate limit reached. Retrying in {wait}s... (Attempt {attempt+1}/5)")
+                print(f"Rate limit reached. Retrying in {wait}s... (Attempt {attempt+1}/5)")
                 time.sleep(wait)
             else:
                 raise e

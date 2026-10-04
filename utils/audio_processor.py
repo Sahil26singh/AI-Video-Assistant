@@ -66,32 +66,42 @@ def convert_to_wav(input_path: str) -> str:
 
 
 
-def chunk_audio(wav_path : str , chunk_minutes : int = 10) -> list:
+def chunk_audio(wav_path: str, chunk_minutes: int = 8) -> tuple:
     audio = AudioSegment.from_wav(wav_path)
+    total_duration_sec = len(audio) / 1000.0
     chunk_ms = chunk_minutes * 60 * 1000 
 
     chunks = []
 
-    for i, start in enumerate(range(0,len(audio),chunk_ms)):
-        chunk = audio[start : start + chunk_ms]
+    for i, start in enumerate(range(0, len(audio), chunk_ms)):
+        chunk = audio[start: start + chunk_ms]
+        if len(chunk) < 500 and len(chunks) > 0:
+            # Skip tiny trailing fraction chunks if we already have chunks
+            continue
         chunk_path = f"{wav_path}_chunk_{i}.wav"
-        chunk.export(chunk_path , format = "wav")
-
+        chunk.export(chunk_path, format="wav")
         chunks.append(chunk_path)
-    
-    return chunks
 
-def process_input(source: str) -> list:
+    if not chunks and len(audio) > 0:
+        chunk_path = f"{wav_path}_chunk_0.wav"
+        audio.export(chunk_path, format="wav")
+        chunks.append(chunk_path)
+
+    return chunks, total_duration_sec
+
+
+def process_input(source: str) -> tuple:
     if source.startswith("http://") or source.startswith("https://"):
         print("Detected YouTube URL. Downloading audio...")
-        wav_path = download_youtube_audio(source)
+        raw_download = download_youtube_audio(source)
+        print("Converting audio to standard 16kHz mono WAV...")
+        wav_path = convert_to_wav(raw_download)
     else:
-        print("Detected local file. Converting to WAV...")
+        print("Detected local file. Converting to 16kHz mono WAV...")
         wav_path = convert_to_wav(source)
 
     print("Chunking audio...")
-    chunks = chunk_audio(wav_path)
-    print(f"Audio ready — {len(chunks)} chunk(s) created.")
-    return chunks
-
+    chunks, duration_sec = chunk_audio(wav_path, chunk_minutes=8)
+    print(f"Audio ready — {len(chunks)} chunk(s) created (duration: {duration_sec:.1f}s).")
+    return chunks, duration_sec
 

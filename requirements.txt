@@ -1,0 +1,31 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# ── Audio / Video Acquisition & Processing ────────────────────────────────────
+yt-dlp>=2024.4.9                  # Audio extraction from YouTube URLs
+pydub>=0.25.1                     # Audio file manipulation, chunking & format conversion
+
+# ── Speech-to-Text (STT) ───────────────────────────────────────────────────────
+groq>=0.9.0                       # Groq Cloud Whisper Large v3 STT API client
+requests>=2.32.0                  # HTTP client for Sarvam AI STT API
+
+# ── Data Processing ───────────────────────────────────────────────────────────
+pandas>=2.0.0                     # Structured Action Items table rendering
+
+# ── LLM Orchestration & Inference ─────────────────────────────────────────────
+langchain-core>=0.2.0             # LCEL runnables, prompts, and output parsers
+langchain-text-splitters>=0.2.0   # Text splitting and chunking
+langchain-groq>=0.1.0             # Groq LLM integration (gpt-oss-120b)
+langchain-mistralai>=0.1.0        # Mistral AI LLM integration (used when no Groq key is configured)
+
+# ── RAG Pipeline & Vector Store ───────────────────────────────────────────────
+chromadb>=0.5.0                   # In-memory ephemeral vector store
+langchain-chroma>=0.1.0           # ChromaDB integration for LangChain
+sentence-transformers>=3.0.0      # HuggingFace embedding models (all-MiniLM-L6-v2)
+torch>=2.2.0                      # PyTorch (CPU-only wheel from extra-index-url)
+langchain-huggingface>=0.0.3      # LangChain HuggingFace embeddings bridge
+
+# ── Frontend Web UI ───────────────────────────────────────────────────────────
+streamlit>=1.35.0                 # Web application framework
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+python-dotenv>=1.0.0              # Environment variable management (.env)
