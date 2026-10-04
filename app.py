@@ -17,13 +17,13 @@ load_dotenv()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
-FAVICON_PATH = os.path.join(ASSETS_DIR, "favicon.png") if os.path.exists(os.path.join(ASSETS_DIR, "favicon.png")) else "🎬"
+FAVICON_PATH = os.path.join(ASSETS_DIR, "favicon.png") if os.path.exists(os.path.join(ASSETS_DIR, "favicon.png")) else None
 LOGO_PATH = os.path.join(ASSETS_DIR, "logo.png")
 
 # ─── Page Config ────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="AI Video Assistant",
-    page_icon=FAVICON_PATH,
+    page_icon=FAVICON_PATH or "video",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -164,30 +164,68 @@ code {
     border: 1px solid rgba(21, 128, 61, 0.2);
 }
 
-/* ── Tab Styling ── */
-.stTabs [data-baseweb="tab-list"] {
-    gap: 8px;
-    background-color: transparent;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 4px;
+/* ── Content Heading Palette Styling (h1-h6) ── */
+.stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+    font-family: 'Syne', sans-serif !important;
+    background: linear-gradient(135deg, rgba(109, 40, 217, 0.08) 0%, rgba(14, 116, 144, 0.04) 100%);
+    border-left: 4px solid var(--accent);
+    padding: 0.4rem 0.8rem !important;
+    border-radius: 0 8px 8px 0;
+    margin-top: 1rem !important;
+    margin-bottom: 0.6rem !important;
+    color: var(--text) !important;
 }
 
-.stTabs [data-baseweb="tab"] {
-    height: 42px;
-    border-radius: 8px;
-    color: var(--text-muted);
-    font-weight: 500;
-    font-size: 0.9rem;
-    padding: 0 16px;
-    background-color: var(--surface);
-    border: 1px solid var(--border);
-    transition: all 0.2s;
-}
-
-.stTabs [aria-selected="true"] {
-    background-color: var(--accent-soft) !important;
+.stMarkdown h4, .stMarkdown h5 {
+    font-family: 'Syne', sans-serif !important;
     color: var(--accent) !important;
-    border-color: var(--accent) !important;
+    border-bottom: 2px solid var(--accent-soft);
+    padding-bottom: 0.25rem;
+    margin-top: 0.85rem !important;
+}
+
+/* ── st.tabs: light green clickable tabs ── */
+[role="tablist"] {
+    gap: 8px !important;
+    border-bottom: 1px solid var(--border) !important;
+    padding-bottom: 8px !important;
+}
+
+[role="tablist"] [role="tab"] {
+    height: 42px !important;
+    padding: 0 18px !important;
+    border-radius: 999px !important;
+    background: #F0FDF4 !important;
+    border: 1px solid #BBF7D0 !important;
+}
+
+/* tab text color + size */
+[role="tablist"] [role="tab"] p {
+    font-size: 1.05rem !important;
+    font-weight: 600 !important;
+    color: #166534 !important;
+    margin: 0 !important;
+}
+
+[role="tablist"] [role="tab"]:hover {
+    background: #DCFCE7 !important;
+    border-color: #86EFAC !important;
+}
+
+[role="tablist"] [role="tab"][aria-selected="true"] {
+    background: #15803D !important;
+    border-color: #15803D !important;
+}
+
+[role="tablist"] [role="tab"][aria-selected="true"] p {
+    color: #FFFFFF !important;
+}
+
+/* hide Streamlit's default underline */
+[role="tablist"] .react-aria-SelectionIndicator,
+[role="tablist"] [data-baseweb="tab-highlight"],
+[role="tablist"] [data-baseweb="tab-border"] {
+    display: none !important;
 }
 
 /* ── Metrics ── */
@@ -200,10 +238,16 @@ code {
 }
 
 [data-testid="stMetricLabel"] {
+    background-color: var(--surface-2);
     color: var(--text-muted) !important;
-    font-size: 0.75rem !important;
+    font-size: 0.72rem !important;
+    font-weight: 600 !important;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    padding: 0.2rem 0.55rem;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 0.35rem;
 }
 
 [data-testid="stMetricValue"] {
@@ -214,7 +258,14 @@ code {
     color: var(--text) !important;
 }
 
-/* ── Sidebar Radio Options Spacing & Divider ── */
+/* ── Sidebar Width & Radio Spacing (Only applied when sidebar is open) ── */
+[data-testid="stSidebar"][aria-expanded="true"],
+section[data-testid="stSidebar"][aria-expanded="true"] {
+    min-width: 350px !important;
+    max-width: 350px !important;
+    width: 350px !important;
+}
+
 [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] {
     gap: 12px !important;
 }
@@ -261,10 +312,47 @@ for key, default in {
         st.session_state[key] = default
 
 # ─── Helper Functions ────────────────────────────────────────────────────────────
-def card(title: str, body_md: str):
-    """Render structured markdown inside a native bordered container."""
+def section_header(title: str, subtitle: str = "", theme: str = "purple"):
+    """Render a filled banner header matching the UI color palette."""
+    themes = {
+        "purple": ("#EDE9FE", "#6D28D9", "#DDD6FE"),
+        "amber": ("#FEF3C7", "#B45309", "#FDE68A"),
+        "cyan": ("#E0F2FE", "#0E7490", "#BAE6FD"),
+        "green": ("#DCFCE7", "#15803D", "#BBF7D0"),
+        "indigo": ("#E0E7FF", "#4338CA", "#C7D2FE"),
+        "neutral": ("#F3EFE9", "#26231F", "#E7E1D8"),
+    }
+    bg, text_clr, border_clr = themes.get(theme, themes["purple"])
+    sub_html = f'<div style="font-size:0.8rem; font-weight: 400; opacity:0.88; text-transform:none; margin-top:3px;">{subtitle}</div>' if subtitle else ""
+
+    st.markdown(
+        f"""
+        <div style="
+            background-color: {bg};
+            color: {text_clr};
+            border: 1px solid {border_clr};
+            border-radius: 8px;
+            padding: 0.5rem 0.85rem;
+            margin-bottom: 0.85rem;
+            font-family: 'Syne', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            display: flex;
+            flex-direction: column;
+        ">
+            <div>{title}</div>
+            {sub_html}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+def card(title: str, body_md: str, theme: str = "purple"):
+    """Render structured markdown inside a native bordered container with a color-matched filled header."""
     with st.container(border=True):
-        st.caption(title.upper())
+        section_header(title, theme=theme)
         st.markdown(body_md)
 
 def reset_session():
@@ -337,12 +425,12 @@ with st.sidebar:
 
     if st.session_state.result:
         st.markdown("<div style='height: 8px'></div>", unsafe_allow_html=True)
-        if st.button("Start new analysis", icon=":material/refresh:", width="stretch", type="secondary"):
+        if st.button("New analysis", icon=":material/refresh:", width="stretch", type="secondary"):
             reset_session()
 
     st.markdown("---")
 
-    st.markdown("**1. Select input source**")
+    section_header("1. Select input source", theme="purple")
     source_type = st.radio(
         "Source Type",
         ["YouTube URL", "Upload File"],
@@ -365,7 +453,7 @@ with st.sidebar:
             help="Click 'Browse files' to choose an audio/video file from your computer."
         )
 
-    st.markdown("**2. Transcription engine**")
+    section_header("2. Transcription engine", theme="cyan")
     language = st.radio(
         "Transcription Engine",
         ["english", "hinglish"],
@@ -422,10 +510,10 @@ if submit_button:
 
                 transcript = transcribe_all(chunks, language, on_progress=update_progress)
 
-                st.markdown(":material/title: **Step 3/5 · Title generation** &nbsp;—&nbsp; <span style='color:var(--text-muted); font-size:0.88rem;'>Writing concise video title</span>", unsafe_allow_html=True)
+                st.markdown(":material/title: **Step 3/5 · Title generation** &nbsp;—&nbsp; <span style='color:var(--text-muted); font-size:0.88rem;'>Generating concise video title</span>", unsafe_allow_html=True)
                 title = generate_title(transcript)
 
-                st.markdown(":material/summarize: **Step 4/5 · Content extraction** &nbsp;—&nbsp; <span style='color:var(--text-muted); font-size:0.88rem;'>Generating executive summary & key takeaways</span>", unsafe_allow_html=True)
+                st.markdown(":material/summarize: **Step 4/5 · Content extraction** &nbsp;—&nbsp; <span style='color:var(--text-muted); font-size:0.88rem;'>Summarizing & extracting key takeaways</span>", unsafe_allow_html=True)
                 summary = summarize(transcript)
                 extracted = extract_all(transcript)
                 action_items, decisions, questions = (
@@ -434,7 +522,7 @@ if submit_button:
                     extracted["open_questions"],
                 )
 
-                st.markdown(":material/hub: **Step 5/5 · Knowledge indexing** &nbsp;—&nbsp; <span style='color:var(--text-muted); font-size:0.88rem;'>Building ChromaDB vector embeddings for interactive chat</span>", unsafe_allow_html=True)
+                st.markdown(":material/hub: **Step 5/5 · Knowledge indexing** &nbsp;—&nbsp; <span style='color:var(--text-muted); font-size:0.88rem;'>Building ChromaDB vector embeddings</span>", unsafe_allow_html=True)
                 rag_chain = build_rag_chain(transcript)
 
                 status.update(label="Analysis complete · Video intelligence ready", state="complete", expanded=False)
@@ -451,7 +539,7 @@ if submit_button:
                 "duration_sec": duration_sec,
                 "language": language,
             }
-            st.toast("Video analyzed successfully!", icon=":material/check_circle:")
+            st.toast("Analysis complete", icon=":material/check_circle:")
             st.rerun()
 
         except Exception as e:
@@ -472,7 +560,7 @@ if st.session_state.result:
 
     # Header Card with Title
     with st.container(border=True):
-        st.caption("SESSION TITLE")
+        section_header("Session title", theme="purple")
         st.markdown(f"### {r['title']}")
         if st.session_state.selected_source_name:
             st.caption(f"Source: {st.session_state.selected_source_name}")
@@ -503,26 +591,26 @@ if st.session_state.result:
     ])
 
     with tab_sum:
-        card("Executive summary", r["summary"])
+        card("Executive summary", r["summary"], theme="purple")
 
     with tab_act:
         df_actions = actions_to_df(r["action_items"])
         if not df_actions.empty:
             with st.container(border=True):
-                st.caption("ACTION ITEMS & TASK OWNERS")
+                section_header("Action items & task owners", theme="amber")
                 st.dataframe(df_actions, hide_index=True, width="stretch")
         else:
-            card("Action items & task owners", r["action_items"])
+            card("Action items & task owners", r["action_items"], theme="amber")
 
     with tab_dec:
-        card("Key takeaways", r["key_decisions"])
+        card("Key takeaways", r["key_decisions"], theme="cyan")
 
     with tab_q:
-        card("Questions & follow-ups", r["open_questions"])
+        card("Questions & follow-ups", r["open_questions"], theme="amber")
 
     with tab_trans:
         with st.container(border=True):
-            st.caption("FULL TRANSCRIPT")
+            section_header("Full transcript", theme="indigo")
             st.container(height=420).text(r["transcript"])
 
         # Export Buttons
@@ -533,27 +621,27 @@ Source: {st.session_state.selected_source_name}
 
 ---
 
-## Executive Summary
+## Executive summary
 {r['summary']}
 
 ---
 
-## Action Items & Owners
+## Action items & task owners
 {r['action_items']}
 
 ---
 
-## Key Takeaways
+## Key takeaways
 {r['key_decisions']}
 
 ---
 
-## Questions & Follow-ups
+## Questions & follow-ups
 {r['open_questions']}
 
 ---
 
-## Full Transcript
+## Full transcript
 {r['transcript']}
 """
         exp_col1, exp_col2, _ = st.columns([2, 2, 4])
@@ -581,15 +669,18 @@ Source: {st.session_state.selected_source_name}
 
     # ─── Interactive Chat Section (Below Summary & Tabs) ───────────────────────────
     with st.container(border=True):
-        st.markdown("### Interactive chat with video")
-        st.caption("Ask questions, explore specific discussion points, or request further synthesis based on the video transcript.")
+        section_header(
+            "Interactive chat with video",
+            subtitle="Ask questions, explore specific discussion points, or request further synthesis based on the video transcript",
+            theme="purple"
+        )
 
         # Quick question suggestion buttons
         st.markdown("**Suggested questions:**")
         q_cols = st.columns(3)
         suggested_prompt = None
 
-        if q_cols[0].button("Key takeaways?", width="stretch"):
+        if q_cols[0].button("Key takeaways", width="stretch"):
             suggested_prompt = "What were the key takeaways from this video?"
         if q_cols[1].button("3-bullet summary", width="stretch"):
             suggested_prompt = "Provide a concise 3-bullet point executive overview of the video."
@@ -635,27 +726,29 @@ Source: {st.session_state.selected_source_name}
     st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
     b_col1, b_col2, b_col3 = st.columns([1, 2, 1])
     with b_col2:
-        if st.button("Start new analysis", icon=":material/refresh:", width="stretch", type="secondary"):
+        if st.button("New analysis", icon=":material/refresh:", width="stretch", type="secondary"):
             reset_session()
 
 else:
     # Empty State (Initial Screen)
-    logo_b64 = get_logo_base64()
-    logo_img_html = f'<img src="data:image/png;base64,{logo_b64}" style="width:110px; height:110px; border-radius:22px; margin-bottom:1.5rem; box-shadow: 0 4px 14px rgba(38,35,31,0.08);" alt="App Logo" />' if logo_b64 else ''
-
-    st.markdown(f"""
-    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:4rem 2rem; text-align:center; background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:0 1px 3px rgba(38,35,31,0.06); margin-top:1.5rem;">
-        {logo_img_html}
-        <div style="font-family:'Syne', sans-serif; font-size:1.6rem; font-weight:700; color:var(--text); margin-bottom:0.5rem;">
-            Ready to transcribe & analyze
+    with st.container(border=True):
+        st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+        if os.path.exists(LOGO_PATH):
+            e_col1, e_col2, e_col3 = st.columns([2, 1, 2])
+            with e_col2:
+                st.image(LOGO_PATH, width=110)
+        st.markdown("""
+        <div style="text-align:center; padding: 1rem 1rem 2rem 1rem;">
+            <div style="font-family:'Syne', sans-serif; font-size:1.6rem; font-weight:700; color:var(--text); margin-bottom:0.5rem;">
+                Ready to transcribe & analyze
+            </div>
+            <div style="color:var(--text-muted); font-size:0.92rem; max-width:480px; margin: 0 auto 1.5rem auto; line-height:1.6;">
+                Enter a YouTube link or upload a local audio/video file in the sidebar, select your language, and click <strong>Run analysis</strong>.
+            </div>
+            <div style="display:flex; gap:0.75rem; flex-wrap:wrap; justify-content:center;">
+                <span class="badge badge-purple">Whisper / Sarvam STT</span>
+                <span class="badge badge-cyan">Structured summaries</span>
+                <span class="badge badge-green">ChromaDB RAG chat</span>
+            </div>
         </div>
-        <div style="color:var(--text-muted); font-size:0.92rem; max-width:480px; line-height:1.6; margin-bottom:1.5rem;">
-            Enter a YouTube link or upload a local audio/video file in the sidebar, select your language, and click <strong>Run analysis</strong>.
-        </div>
-        <div style="display:flex; gap:0.75rem; flex-wrap:wrap; justify-content:center;">
-            <span class="badge badge-purple">Whisper / Sarvam STT</span>
-            <span class="badge badge-cyan">Structured summaries</span>
-            <span class="badge badge-green">ChromaDB RAG chat</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
