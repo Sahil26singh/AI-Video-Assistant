@@ -1,141 +1,137 @@
-# 🎬 AI Video Assistant
+# AI Video Assistant
 
-> **AI-Powered Video Intelligence & RAG Chat** — Transcribe, Summarize, Extract Action Items & Chat with any Video.
-
-An end-to-end AI video intelligence system that processes YouTube videos or local audio/video files, transcribes speech with ultra-fast cloud STT, generates structured multi-section summaries & action items, and enables **Interactive RAG Chat** with live token streaming.
+AI Video Assistant is a Python tool that transcribes, analyzes, and indexes video and audio content for interactive retrieval-augmented generation (RAG) chat. It supports both public YouTube URLs and local media uploads, offering dual speech-to-text backends (Groq Whisper for global audio and Sarvam AI for Hindi/Hinglish speech).
 
 ---
 
-## 🌟 Key Features
+## Overview
 
-- **Multi-Source Audio Acquisition**:
-  - Download and extract audio directly from YouTube URLs via `yt-dlp`.
-  - Upload local audio/video files (`.mp4`, `.mp3`, `.wav`, `.m4a`, `.mkv`, `.webm`, `.aac`, `.ogg`, `.flac`).
-  - Automatic conversion to standardized 16kHz mono WAV chunks with exact duration measurement (`pydub` + `ffmpeg`).
-  - Isolated temporary upload directories with automatic cleanup upon completion.
-
-- **High-Speed Speech-to-Text (STT)**:
-  - **English / Global**: Ultra-fast Groq Whisper Large v3 (`whisper-large-v3`) with automatic payload-splitting protection (<20MB chunks) and exponential backoff retry.
-  - **Hinglish / Hindi**: Sarvam AI STT-Translate API (`saaras:v2.5`), converting spoken Hindi/Hinglish directly into English text.
-  - Live chunk-by-chunk transcription progress indicators in the UI.
-
-- **Automated Video Intelligence & Extraction**:
-  - 🏷️ **Video Title**: Short, descriptive title generated from transcript context.
-  - 📋 **Executive Summary**: Structured, bullet-pointed multi-part executive overview.
-  - ✅ **Action Items & Task Owners**: Parsed into a structured table (`Task | Owner | Deadline`).
-  - 🔑 **Key Takeaways**: Core conclusions, insights, and key takeaways.
-  - ❓ **Questions & Follow-ups**: Unresolved questions, open topics, and recommended next steps.
-
-- **Interactive RAG Chat**:
-  - Chat directly with the video content using LangChain LCEL chains.
-  - In-memory ephemeral ChromaDB vector collections with unique session UUIDs (zero disk residue, instant memory recycling).
-  - Cached HuggingFace embeddings (`all-MiniLM-L6-v2`) on CPU.
-  - Real-time token streaming with Groq (`openai/gpt-oss-120b`) / Mistral AI (`mistral-small-latest`).
-
-- **Export & Reporting**:
-  - ⬇️ Download full transcript as `.txt`.
-  - ⬇️ Download complete structured intelligence report as Markdown (`.md`).
-
-- **Dual Interfaces**:
-  - 🎨 **Web UI**: Modern Streamlit dashboard with custom typography (`Inter` / `Syne`), metrics cards, Material icons, and responsive layout.
-  - 🖥️ **CLI Mode**: Fast terminal entry point via `python main.py`.
+The application processes video or audio input through a multi-stage pipeline:
+1. **Audio Acquisition & Normalization**: Downloads audio from YouTube URLs via `yt-dlp` or processes local uploads (`.mp4`, `.mp3`, `.wav`, etc.), standardizing them into 16 kHz mono WAV chunks using `pydub` and FFmpeg.
+2. **Speech-to-Text**: Transcribes audio using either Groq Cloud's `whisper-large-v3` (with chunking and backoff retries) or Sarvam AI (`saaras:v2.5` for Hindi/Hinglish speech-to-text translation).
+3. **Structured Intelligence Extraction**: Generates an executive summary, action items table (with assignees and deadlines), key takeaways, open questions, and a video title in a single pass.
+4. **Interactive RAG Chat**: Indexes transcript chunks into an ephemeral, in-memory ChromaDB vector store using HuggingFace embeddings (`all-MiniLM-L6-v2`) and answers questions via LangChain LCEL with token streaming.
 
 ---
 
-## 🏗️ Project Structure
+## Architecture
 
 ```
 AI-Video-Assistant/
-├── app.py                   # Streamlit Web Application (Modern Dark UI)
-├── main.py                  # Terminal CLI Pipeline
-├── requirements.txt         # Project Dependencies
-├── .env                     # API Keys & Model Configurations
+├── app.py                   # Streamlit web dashboard
+├── main.py                  # Command-line interface
+├── requirements.txt         # Project dependencies
+├── .env                     # API keys and environment variables
 ├── core/
-│   ├── transcriber.py       # Groq Whisper & Sarvam AI STT with progress callbacks
-│   ├── summarizer.py        # Map-reduce video summarizer & title generator
-│   ├── extractor.py         # Single-pass structured extractor (Action Items, Takeaways, Questions)
-│   ├── vector_store.py      # In-memory ChromaDB vector store & cached HuggingFace embeddings
-│   └── rag_engine.py        # RAG pipeline with grounded answering & token streaming
+│   ├── transcriber.py       # Groq Whisper and Sarvam AI transcription
+│   ├── summarizer.py        # Map-reduce summarization and title generator
+│   ├── extractor.py         # Structured extraction (action items, takeaways, questions)
+│   ├── vector_store.py      # In-memory ChromaDB and cached HuggingFace embeddings
+│   └── rag_engine.py        # LCEL retrieval chain with token streaming
 └── utils/
-    └── audio_processor.py   # YouTube download, 16kHz mono normalization & chunking
+    └── audio_processor.py   # YouTube download, 16 kHz normalization, and chunking
 ```
 
 ---
 
-## 🚀 Getting Started
+## Tech Stack
 
-### 1. Prerequisites
-- **Python 3.10+**
-- **FFmpeg**: Ensure `ffmpeg` is available on your system path (e.g., via WinGet, Chocolatey, or Homebrew).
+| Component | Technology | Description |
+|---|---|---|
+| **Frontend** | Streamlit | Web interface with custom styling and streaming responses |
+| **Orchestration** | LangChain LCEL | Composable runnables for extraction and retrieval |
+| **STT (Global)** | Groq Whisper (`whisper-large-v3`) | Ultra-fast cloud speech-to-text |
+| **STT (Indic)** | Sarvam AI (`saaras:v2.5`) | Hindi and Hinglish speech translation to English |
+| **Primary LLM** | Groq Cloud (`openai/gpt-oss-120b`) | Primary inference engine for summaries and RAG |
+| **Alternative LLM** | Mistral AI (`mistral-small-latest`) | Used when no Groq key is configured |
+| **Vector Store** | ChromaDB | Ephemeral in-memory collections per session |
+| **Embeddings** | HuggingFace (`all-MiniLM-L6-v2`) | Local CPU sentence embeddings |
+| **Audio Processing** | `pydub`, `yt-dlp`, FFmpeg | Format conversion, normalization, and chunking |
 
-### 2. Installation
+---
 
-Clone the repository and set up a virtual environment:
+## Prerequisites
 
-```bash
-git clone https://github.com/Sahil26singh/AI-Video-Assistant.git
-cd AI-Video-Assistant
+- **Python**: 3.10 or higher
+- **FFmpeg**: Must be installed and accessible on your system `PATH`.
+  - Windows: `winget install Gyan.FFmpeg` or `choco install ffmpeg`
+  - macOS: `brew install ffmpeg`
+  - Linux: `sudo apt install ffmpeg`
 
-# Create virtual environment
-python -m venv .venv
+---
 
-# Activate virtual environment
-# Windows (PowerShell):
-.\.venv\Scripts\Activate.ps1
-# Windows (CMD):
-.\.venv\Scripts\activate.bat
-# Linux / macOS:
-source .venv/bin/activate
+## Installation
 
-# Install dependencies
-pip install -r requirements.txt
-```
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/Sahil26singh/AI-Video-Assistant.git
+   cd AI-Video-Assistant
+   ```
 
-### 3. Environment Configuration
+2. **Create and activate a virtual environment**:
+   ```bash
+   # Windows (PowerShell)
+   python -m venv .venv
+   .\.venv\Scripts\Activate.ps1
 
-Create a `.env` file in the project root:
+   # Linux / macOS
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+3. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+---
+
+## Configuration
+
+Create a `.env` file in the root directory:
 
 ```env
-GROQ_API_KEY=your_groq_api_key_here
-MISTRAL_API_KEY=your_mistral_api_key_here
-SARVAM_API_KEY=your_sarvam_api_key_here
+GROQ_API_KEY=your_groq_api_key
+SARVAM_API_KEY=your_sarvam_api_key
+MISTRAL_API_KEY=your_mistral_api_key
 ```
 
-| Key | Description | Required For |
+### Key Reference
+
+| Variable | Required | Description |
 |---|---|---|
-| `GROQ_API_KEY` | Groq Cloud API key | Fast Whisper STT, LLM summarization & RAG |
-| `SARVAM_API_KEY` | Sarvam AI API key | Hinglish / Hindi speech-to-text translation |
-| `MISTRAL_API_KEY` | Mistral AI API key | LLM provider used when no Groq key is configured |
+| `GROQ_API_KEY` | Recommended | Used for Groq Whisper transcription and primary LLM generation |
+| `SARVAM_API_KEY` | Optional | Required only when selecting Hindi / Hinglish transcription |
+| `MISTRAL_API_KEY` | Optional | Used when no Groq API key is configured |
 
 ---
 
-## 🖥️ Running the Application
+## Usage
 
-### Option A: Streamlit Web Dashboard (Recommended)
+### Web Interface (Streamlit)
 
+Launch the web app:
 ```bash
 streamlit run app.py
 ```
 
-1. Select your input source (**YouTube URL** or **Upload File**).
-2. Choose your transcription engine (**English / Global** or **Hinglish / Hindi**).
-3. Click **⚡ Run Analysis**.
-4. Explore executive summaries, action items table, key takeaways, and chat interactively with the video below.
+1. Choose the input source (YouTube URL or local file upload).
+2. Select the transcription engine (English / Global or Hinglish / Hindi).
+3. Click **Run analysis**.
+4. View structured tabs for the summary, action items table, takeaways, and full transcript.
+5. Use the chat section below to query the video transcript with streaming responses.
 
-### Option B: Terminal CLI Interface
+### Command-Line Interface (CLI)
 
+Run the terminal pipeline:
 ```bash
 python main.py
 ```
 
+Provide a YouTube URL or path to a local media file when prompted, and enter interactive Q&A mode once processing finishes.
+
 ---
 
-## 🛠️ Technology Stack
+## License
 
-- **Frontend**: [Streamlit](https://streamlit.io/)
-- **Orchestration**: [LangChain](https://python.langchain.com/) (LCEL)
-- **STT Engines**: [Groq Whisper Large v3](https://console.groq.com/) & [Sarvam AI](https://sarvam.ai/)
-- **LLMs**: Groq (`openai/gpt-oss-120b`) / Mistral AI (`mistral-small-latest`, used when no Groq key is configured)
-- **Vector Database**: [ChromaDB](https://www.trychroma.com/) (Ephemeral in-memory collections)
-- **Embeddings**: HuggingFace [`all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2)
-- **Audio Processing**: [pydub](https://github.com/jiaaro/pydub), [yt-dlp](https://github.com/yt-dlp/yt-dlp), [FFmpeg](https://ffmpeg.org/)
+This project is licensed under the MIT License.
