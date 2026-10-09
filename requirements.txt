@@ -3,7 +3,6 @@
 # ── Audio / Video Acquisition & Processing ────────────────────────────────────
 yt-dlp>=2024.4.9                  # Audio extraction from YouTube URLs
 pydub>=0.25.1                     # Audio file manipulation, chunking & format conversion
-pyaudioop                         # Drop-in replacement for audioop (required on Python 3.13+)
 
 # ── Speech-to-Text (STT) ───────────────────────────────────────────────────────
 groq>=0.9.0                       # Groq Cloud Whisper Large v3 STT API client
