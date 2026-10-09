@@ -27,6 +27,11 @@ def download_youtube_audio(url: str) -> str:
         "format": "bestaudio/best",
         "outtmpl": output_template,
         "noplaylist": True,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "ios"]
+            }
+        },
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
