@@ -23,14 +23,35 @@ def download_youtube_audio(url: str) -> str:
     ffmpeg_exe = shutil.which("ffmpeg")
     ffmpeg_dir = os.path.dirname(ffmpeg_exe) if ffmpeg_exe else None
 
+    # Check for cookies file (needed for Streamlit Cloud / cloud datacenter IPs)
+    cookie_file = None
+    if os.path.exists("cookies.txt"):
+        cookie_file = "cookies.txt"
+    else:
+        cookies_content = os.getenv("YOUTUBE_COOKIES")
+        if not cookies_content:
+            try:
+                import streamlit as st
+                if hasattr(st, "secrets") and "YOUTUBE_COOKIES" in st.secrets:
+                    cookies_content = st.secrets["YOUTUBE_COOKIES"]
+            except Exception:
+                pass
+        if cookies_content:
+            cookie_file = os.path.join(DOWNLOAD_DIR, "yt_cookies.txt")
+            with open(cookie_file, "w", encoding="utf-8") as f:
+                f.write(cookies_content)
+
     ydl_opts = {
         "format": "bestaudio/best",
         "outtmpl": output_template,
         "noplaylist": True,
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "ios"]
+                "player_client": ["web", "mweb", "tv"]
             }
+        },
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
         },
         "postprocessors": [
             {
@@ -41,6 +62,9 @@ def download_youtube_audio(url: str) -> str:
         ],
         "quiet": True,
     }
+
+    if cookie_file and os.path.exists(cookie_file):
+        ydl_opts["cookiefile"] = cookie_file
 
     if ffmpeg_dir:
         ydl_opts["ffmpeg_location"] = ffmpeg_dir
