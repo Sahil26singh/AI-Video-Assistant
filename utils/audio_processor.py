@@ -111,15 +111,13 @@ def download_youtube_audio(url: str) -> str:
 
     if cookie_file and os.path.exists(cookie_file):
         try:
-            with open(cookie_file, "r", encoding="utf-8", errors="ignore") as f:
-                header = f.readline()
-            if "# Netscape" in header or "# HTTP" in header or ".youtube.com" in header:
-                ydl_opts["cookiefile"] = cookie_file
-                print(f"[yt-dlp] Using YouTube cookies from {cookie_file}")
-            else:
-                print(f"[yt-dlp] Ignoring {cookie_file}: Not a valid Netscape cookies format.")
-        except Exception:
-            pass
+            import http.cookiejar
+            cj = http.cookiejar.MozillaCookieJar(cookie_file)
+            cj.load(ignore_discard=True, ignore_expires=True)
+            ydl_opts["cookiefile"] = cookie_file
+            print(f"[yt-dlp] Using YouTube cookies from {cookie_file} ({len(cj)} cookies loaded).")
+        except Exception as ce:
+            print(f"[yt-dlp] Skipping {cookie_file} (invalid cookie format: {ce}).")
     else:
         print("[yt-dlp] Note: No cookies provided. Cloud hosting IPs may require YOUTUBE_COOKIES.")
 
