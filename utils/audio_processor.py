@@ -69,10 +69,23 @@ def download_youtube_audio(url: str) -> str:
                     cookies_content = st.secrets["YOUTUBE_COOKIES"]
             except Exception:
                 pass
-        if cookies_content:
-            cookie_file = os.path.join(DOWNLOAD_DIR, "yt_cookies.txt")
-            with open(cookie_file, "w", encoding="utf-8") as f:
-                f.write(cookies_content)
+        if cookies_content and isinstance(cookies_content, str):
+            clean_content = cookies_content.strip()
+            # Strip enclosing quotes if accidentally passed
+            if clean_content.startswith('"""') and clean_content.endswith('"""'):
+                clean_content = clean_content[3:-3].strip()
+            elif clean_content.startswith("'''") and clean_content.endswith("'''"):
+                clean_content = clean_content[3:-3].strip()
+
+            # Ensure proper Netscape cookie file header
+            if not clean_content.startswith("# Netscape") and not clean_content.startswith("# HTTP"):
+                clean_content = "# Netscape HTTP Cookie File\n" + clean_content
+
+            # Only write if it contains valid YouTube cookie data
+            if ".youtube.com" in clean_content:
+                cookie_file = os.path.join(DOWNLOAD_DIR, "yt_cookies.txt")
+                with open(cookie_file, "w", encoding="utf-8") as f:
+                    f.write(clean_content + "\n")
 
     ydl_opts = {
         "format": "bestaudio/best",
@@ -97,8 +110,16 @@ def download_youtube_audio(url: str) -> str:
     }
 
     if cookie_file and os.path.exists(cookie_file):
-        print(f"[yt-dlp] Using YouTube cookies from {cookie_file}")
-        ydl_opts["cookiefile"] = cookie_file
+        try:
+            with open(cookie_file, "r", encoding="utf-8", errors="ignore") as f:
+                header = f.readline()
+            if "# Netscape" in header or "# HTTP" in header or ".youtube.com" in header:
+                ydl_opts["cookiefile"] = cookie_file
+                print(f"[yt-dlp] Using YouTube cookies from {cookie_file}")
+            else:
+                print(f"[yt-dlp] Ignoring {cookie_file}: Not a valid Netscape cookies format.")
+        except Exception:
+            pass
     else:
         print("[yt-dlp] Note: No cookies provided. Cloud hosting IPs may require YOUTUBE_COOKIES.")
 
