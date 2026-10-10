@@ -25,28 +25,26 @@ def extract_video_id(url: str) -> str:
 
 def get_youtube_transcript(url: str) -> str:
     """
-    Attempt to fetch official or auto-generated YouTube transcripts directly.
-    Works instantaneously (under 1 second), uses zero audio bandwidth,
-    supports any language (English, Hindi, etc.), and works on cloud platforms.
+    Fetch YouTube transcript using a 3-layer strategy:
+      1. youtube-transcript-api (fastest, works on localhost)
+      2. Invidious public API (bypasses YouTube IP bans on cloud servers)
+      3. Additional Invidious instances as further fallbacks
+    Returns plain transcript text, or "" if all methods fail.
     """
+    import requests
+
     video_id = extract_video_id(url)
     if not video_id:
         return ""
 
+    # ── Layer 1: youtube-transcript-api ──────────────────────────────────────
     try:
-        import requests
-        from youtube_transcript_api import YouTubeTranscriptApi
+        from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 
-        session = requests.Session()
-        session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
-        })
-
-        ytta = YouTubeTranscriptApi(http_client=session)
-
+        ytta = YouTubeTranscriptApi()
         snippets = None
-        # 1. First attempt: iterate through all available transcripts (manual or auto-generated in any language)
+
+        # Try all available transcripts (manual + auto-generated, any language)
         try:
             t_list = ytta.list(video_id)
             for t in t_list:
@@ -59,7 +57,7 @@ def get_youtube_transcript(url: str) -> str:
         except Exception:
             pass
 
-        # 2. Fallback: try fetching with explicit language list (English, Hindi, etc.)
+        # Explicit language fallback
         if not snippets:
             for lang_code in ["en", "hi", "en-US", "en-GB"]:
                 try:
@@ -70,13 +68,83 @@ def get_youtube_transcript(url: str) -> str:
                     continue
 
         if snippets:
-            text = " ".join(getattr(s, "text", "") if not isinstance(s, dict) else s.get("text", "") for s in snippets)
-            cleaned = text.strip()
-            if cleaned:
-                print(f"[Transcript API] Successfully fetched direct YouTube transcript ({len(cleaned)} chars).")
-                return cleaned
+            text = " ".join(
+                getattr(s, "text", "") if not isinstance(s, dict) else s.get("text", "")
+                for s in snippets
+            ).strip()
+            if text:
+                print(f"[Transcript API] Successfully fetched direct YouTube transcript ({len(text)} chars).")
+                return text
+
     except Exception as e:
-        print(f"[Transcript API] Direct transcript not available for {video_id}: {e}")
+        print(f"[Transcript API] Layer 1 failed for {video_id}: {e}")
+
+    # ── Layer 2: Invidious public API (works on AWS/cloud IPs) ───────────────
+    # Invidious is an open-source YouTube frontend running on non-AWS servers,
+    # so it bypasses the IP ban that cloud-hosted apps face with YouTube directly.
+    INVIDIOUS_INSTANCES = [
+        "https://invidious.nerdvpn.de",
+        "https://invidious.privacyredirect.com",
+        "https://inv.nadeko.net",
+        "https://invidious.lunar.icu",
+        "https://iv.melmac.space",
+        "https://invidious.perennialte.ch",
+    ]
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; AI-Video-Assistant/1.0)",
+        "Accept": "application/json",
+    }
+
+    for instance in INVIDIOUS_INSTANCES:
+        try:
+            api_url = f"{instance}/api/v1/captions/{video_id}"
+            resp = requests.get(api_url, headers=headers, timeout=8)
+            if resp.status_code != 200:
+                continue
+
+            data = resp.json()
+            captions = data.get("captions", [])
+            if not captions:
+                print(f"[Invidious] No captions found on {instance} for {video_id}.")
+                break  # No captions exist — no point trying other instances
+
+            # Prefer English, then auto-generated, then first available
+            chosen = None
+            for cap in captions:
+                label = cap.get("label", "").lower()
+                if "english" in label and "auto" not in label:
+                    chosen = cap
+                    break
+            if not chosen:
+                for cap in captions:
+                    if "english" in cap.get("label", "").lower():
+                        chosen = cap
+                        break
+            if not chosen:
+                chosen = captions[0]
+
+            caption_url = f"{instance}{chosen['url']}&format=json"
+            cap_resp = requests.get(caption_url, headers=headers, timeout=10)
+            if cap_resp.status_code != 200:
+                continue
+
+            lines = cap_resp.json()
+            text = " ".join(
+                line.get("text", "").strip()
+                for line in lines
+                if line.get("text", "").strip()
+            ).strip()
+
+            if text:
+                print(f"[Invidious] Fetched transcript via {instance} ({len(text)} chars).")
+                return text
+
+        except Exception as e:
+            print(f"[Invidious] Instance {instance} failed: {e}")
+            continue
+
+    print(f"[Transcript] All transcript methods exhausted for {video_id}.")
     return ""
 
 
