@@ -27,7 +27,7 @@ def get_youtube_transcript(url: str) -> str:
     """
     Attempt to fetch official or auto-generated YouTube transcripts directly.
     Works instantaneously (under 1 second), uses zero audio bandwidth,
-    and reliably works on cloud platforms (AWS / Streamlit Cloud) without 403 Forbidden.
+    supports any language (English, Hindi, etc.), and works on cloud platforms.
     """
     video_id = extract_video_id(url)
     if not video_id:
@@ -36,9 +36,7 @@ def get_youtube_transcript(url: str) -> str:
     try:
         import requests
         from youtube_transcript_api import YouTubeTranscriptApi
-        import http.cookiejar
 
-        # Mimic standard browser headers so cloud datacenters (AWS) are not immediately flagged
         session = requests.Session()
         session.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
@@ -48,27 +46,35 @@ def get_youtube_transcript(url: str) -> str:
         ytta = YouTubeTranscriptApi(http_client=session)
 
         snippets = None
-        # Try fetching any available transcript (manual, auto-generated, any language)
-        if hasattr(ytta, "list"):
-            try:
-                t_list = ytta.list(video_id)
-                first_t = next(iter(t_list), None)
-                if first_t:
-                    snippets = first_t.fetch()
-            except Exception:
-                pass
+        # 1. First attempt: iterate through all available transcripts (manual or auto-generated in any language)
+        try:
+            t_list = ytta.list(video_id)
+            for t in t_list:
+                try:
+                    snippets = t.fetch()
+                    if snippets:
+                        break
+                except Exception:
+                    continue
+        except Exception:
+            pass
 
+        # 2. Fallback: try fetching with explicit language list (English, Hindi, etc.)
         if not snippets:
-            if hasattr(ytta, "fetch"):
-                snippets = ytta.fetch(video_id)
-            else:
-                snippets = YouTubeTranscriptApi.get_transcript(video_id)
+            for lang_code in ["en", "hi", "en-US", "en-GB"]:
+                try:
+                    snippets = ytta.fetch(video_id, languages=[lang_code])
+                    if snippets:
+                        break
+                except Exception:
+                    continue
 
-        text = " ".join(getattr(s, "text", "") if not isinstance(s, dict) else s.get("text", "") for s in snippets)
-        cleaned = text.strip()
-        if cleaned:
-            print(f"[Transcript API] Successfully fetched direct YouTube transcript ({len(cleaned)} chars).")
-            return cleaned
+        if snippets:
+            text = " ".join(getattr(s, "text", "") if not isinstance(s, dict) else s.get("text", "") for s in snippets)
+            cleaned = text.strip()
+            if cleaned:
+                print(f"[Transcript API] Successfully fetched direct YouTube transcript ({len(cleaned)} chars).")
+                return cleaned
     except Exception as e:
         print(f"[Transcript API] Direct transcript not available for {video_id}: {e}")
     return ""
@@ -79,37 +85,6 @@ def download_youtube_audio(url: str) -> str:
     
     ffmpeg_exe = shutil.which("ffmpeg")
     ffmpeg_dir = os.path.dirname(ffmpeg_exe) if ffmpeg_exe else None
-
-    # Check for cookies file (needed for Streamlit Cloud / cloud datacenter IPs)
-    cookie_file = None
-    if os.path.exists("cookies.txt"):
-        cookie_file = "cookies.txt"
-    else:
-        cookies_content = os.getenv("YOUTUBE_COOKIES")
-        if not cookies_content:
-            try:
-                import streamlit as st
-                if hasattr(st, "secrets") and "YOUTUBE_COOKIES" in st.secrets:
-                    cookies_content = st.secrets["YOUTUBE_COOKIES"]
-            except Exception:
-                pass
-        if cookies_content and isinstance(cookies_content, str):
-            clean_content = cookies_content.strip()
-            # Strip enclosing quotes if accidentally passed
-            if clean_content.startswith('"""') and clean_content.endswith('"""'):
-                clean_content = clean_content[3:-3].strip()
-            elif clean_content.startswith("'''") and clean_content.endswith("'''"):
-                clean_content = clean_content[3:-3].strip()
-
-            # Ensure proper Netscape cookie file header
-            if not clean_content.startswith("# Netscape") and not clean_content.startswith("# HTTP"):
-                clean_content = "# Netscape HTTP Cookie File\n" + clean_content
-
-            # Only write if it contains valid YouTube cookie data
-            if ".youtube.com" in clean_content:
-                cookie_file = os.path.join(DOWNLOAD_DIR, "yt_cookies.txt")
-                with open(cookie_file, "w", encoding="utf-8") as f:
-                    f.write(clean_content + "\n")
 
     ydl_opts = {
         "format": "bestaudio/best",
@@ -132,18 +107,6 @@ def download_youtube_audio(url: str) -> str:
         ],
         "quiet": True,
     }
-
-    if cookie_file and os.path.exists(cookie_file):
-        try:
-            import http.cookiejar
-            cj = http.cookiejar.MozillaCookieJar(cookie_file)
-            cj.load(ignore_discard=True, ignore_expires=True)
-            ydl_opts["cookiefile"] = cookie_file
-            print(f"[yt-dlp] Using YouTube cookies from {cookie_file} ({len(cj)} cookies loaded).")
-        except Exception as ce:
-            print(f"[yt-dlp] Skipping {cookie_file} (invalid cookie format: {ce}).")
-    else:
-        print("[yt-dlp] Note: No cookies provided. Cloud hosting IPs may require YOUTUBE_COOKIES.")
 
     if ffmpeg_dir:
         ydl_opts["ffmpeg_location"] = ffmpeg_dir

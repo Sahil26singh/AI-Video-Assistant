@@ -69,7 +69,7 @@ def transcribe_chunk_groq(chunk_path: str) -> str:
         return _call_groq_api(chunk_path)
 
     # If chunk is oversized (>20MB), slice into 5-minute sub-pieces
-    print(f"⚠️ Chunk {chunk_path} is {file_size_mb:.1f}MB (>20MB). Splitting into smaller pieces for Groq...")
+    print(f" Chunk {chunk_path} is {file_size_mb:.1f}MB (>20MB). Splitting into smaller pieces for Groq...")
     sub_ms = 5 * 60 * 1000
     combined_text = ""
     for idx, start in enumerate(range(0, len(audio), sub_ms)):
@@ -105,7 +105,7 @@ def _send_to_sarvam(piece_path: str) -> str:
         )
 
     if not response.ok:
-        print(f"\n❌ Sarvam returned {response.status_code}")
+        print(f"\n Sarvam returned {response.status_code}")
         print(f"Response body: {response.text}\n")
         response.raise_for_status()
 
