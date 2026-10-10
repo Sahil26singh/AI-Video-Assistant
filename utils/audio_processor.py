@@ -45,21 +45,6 @@ def get_youtube_transcript(url: str) -> str:
             "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
         })
 
-        # Load cookies if available
-        cookie_file = None
-        if os.path.exists("cookies.txt"):
-            cookie_file = "cookies.txt"
-        elif os.path.exists(os.path.join(DOWNLOAD_DIR, "yt_cookies.txt")):
-            cookie_file = os.path.join(DOWNLOAD_DIR, "yt_cookies.txt")
-
-        if cookie_file:
-            try:
-                cj = http.cookiejar.MozillaCookieJar(cookie_file)
-                cj.load(ignore_discard=True, ignore_expires=True)
-                session.cookies = cj
-            except Exception:
-                pass
-
         ytta = YouTubeTranscriptApi(http_client=session)
 
         snippets = None
