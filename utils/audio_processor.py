@@ -34,12 +34,51 @@ def get_youtube_transcript(url: str) -> str:
         return ""
 
     try:
+        import requests
         from youtube_transcript_api import YouTubeTranscriptApi
-        ytta = YouTubeTranscriptApi()
-        if hasattr(ytta, "fetch"):
-            snippets = ytta.fetch(video_id)
-        else:
-            snippets = YouTubeTranscriptApi.get_transcript(video_id)
+        import http.cookiejar
+
+        # Mimic standard browser headers so cloud datacenters (AWS) are not immediately flagged
+        session = requests.Session()
+        session.headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
+        })
+
+        # Load cookies if available
+        cookie_file = None
+        if os.path.exists("cookies.txt"):
+            cookie_file = "cookies.txt"
+        elif os.path.exists(os.path.join(DOWNLOAD_DIR, "yt_cookies.txt")):
+            cookie_file = os.path.join(DOWNLOAD_DIR, "yt_cookies.txt")
+
+        if cookie_file:
+            try:
+                cj = http.cookiejar.MozillaCookieJar(cookie_file)
+                cj.load(ignore_discard=True, ignore_expires=True)
+                session.cookies = cj
+            except Exception:
+                pass
+
+        ytta = YouTubeTranscriptApi(http_client=session)
+
+        snippets = None
+        # Try fetching any available transcript (manual, auto-generated, any language)
+        if hasattr(ytta, "list"):
+            try:
+                t_list = ytta.list(video_id)
+                first_t = next(iter(t_list), None)
+                if first_t:
+                    snippets = first_t.fetch()
+            except Exception:
+                pass
+
+        if not snippets:
+            if hasattr(ytta, "fetch"):
+                snippets = ytta.fetch(video_id)
+            else:
+                snippets = YouTubeTranscriptApi.get_transcript(video_id)
+
         text = " ".join(getattr(s, "text", "") if not isinstance(s, dict) else s.get("text", "") for s in snippets)
         cleaned = text.strip()
         if cleaned:
