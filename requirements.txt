@@ -2,6 +2,7 @@
 
 # ── Audio / Video Acquisition & Processing ────────────────────────────────────
 yt-dlp>=2024.4.9                  # Audio extraction from YouTube URLs
+youtube-transcript-api>=0.6.2     # Fast direct YouTube transcript extraction
 pydub>=0.25.1                     # Audio file manipulation, chunking & format conversion
 
 # ── Speech-to-Text (STT) ───────────────────────────────────────────────────────

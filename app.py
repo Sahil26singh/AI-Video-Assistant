@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 
-from utils.audio_processor import process_input
+from utils.audio_processor import process_input, get_youtube_transcript
 from core.transcriber import transcribe_all
 from core.summarizer import summarize, generate_title
 from core.extractor import extract_all
@@ -203,14 +203,30 @@ if run:
         st.session_state.update(result=None, chat=[], source=name)
         try:
             with st.status("Processing video intelligence pipeline...", expanded=True) as status:
-                st.markdown(":material/graphic_eq: **Step 1/5 · Audio preparation** — normalizing and chunking")
-                chunks, duration = process_input(target)
+                transcript = ""
+                chunks_count = 0
+                duration = 0.0
 
-                prog = st.empty()
-                def on_progress(cur, total):
-                    prog.markdown(f":material/transcribe: **Step 2/5 · Transcription** — chunk {cur} of {total} via {language.capitalize()}")
-                on_progress(1, len(chunks))
-                transcript = transcribe_all(chunks, language, on_progress=on_progress)
+                # 1. Fast track: Attempt direct YouTube transcript first (bypasses 403 Forbidden & quotas)
+                if source_type == "YouTube URL":
+                    st.markdown(":material/subtitles: Checking for native YouTube transcript...")
+                    direct_transcript = get_youtube_transcript(target)
+                    if direct_transcript:
+                        transcript = direct_transcript
+                        chunks_count = 1
+                        st.markdown(":material/check_circle: **Native transcript loaded** — bypassed audio download & quotas!")
+
+                # 2. Fallback: Full audio extraction & AI transcription pipeline
+                if not transcript:
+                    st.markdown(":material/graphic_eq: **Step 1/5 · Audio preparation** — normalizing and chunking")
+                    chunks, duration = process_input(target)
+                    chunks_count = len(chunks)
+
+                    prog = st.empty()
+                    def on_progress(cur, total):
+                        prog.markdown(f":material/transcribe: **Step 2/5 · Transcription** — chunk {cur} of {total} via {language.capitalize()}")
+                    on_progress(1, len(chunks))
+                    transcript = transcribe_all(chunks, language, on_progress=on_progress)
 
                 st.markdown(":material/title: **Step 3/5 · Title** — generating video title")
                 title = generate_title(transcript)
@@ -227,7 +243,7 @@ if run:
                 "title": title, "transcript": transcript, "summary": summary,
                 "action_items": ex["action_items"], "key_decisions": ex["key_decisions"],
                 "open_questions": ex["open_questions"], "rag_chain": rag_chain,
-                "chunks": len(chunks), "duration": duration, "language": language,
+                "chunks": chunks_count, "duration": duration, "language": language,
             }
             st.toast("Analysis complete", icon=":material/check_circle:")
             st.rerun()

@@ -17,6 +17,39 @@ from pydub import AudioSegment
 DOWNLOAD_DIR = 'downloades'
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+def extract_video_id(url: str) -> str:
+    import re
+    match = re.search(r"(?:v=|youtu\.be/|shorts/)([A-Za-z0-9_-]{11})", url)
+    return match.group(1) if match else ""
+
+
+def get_youtube_transcript(url: str) -> str:
+    """
+    Attempt to fetch official or auto-generated YouTube transcripts directly.
+    Works instantaneously (under 1 second), uses zero audio bandwidth,
+    and reliably works on cloud platforms (AWS / Streamlit Cloud) without 403 Forbidden.
+    """
+    video_id = extract_video_id(url)
+    if not video_id:
+        return ""
+
+    try:
+        from youtube_transcript_api import YouTubeTranscriptApi
+        ytta = YouTubeTranscriptApi()
+        if hasattr(ytta, "fetch"):
+            snippets = ytta.fetch(video_id)
+        else:
+            snippets = YouTubeTranscriptApi.get_transcript(video_id)
+        text = " ".join(getattr(s, "text", "") if not isinstance(s, dict) else s.get("text", "") for s in snippets)
+        cleaned = text.strip()
+        if cleaned:
+            print(f"[Transcript API] Successfully fetched direct YouTube transcript ({len(cleaned)} chars).")
+            return cleaned
+    except Exception as e:
+        print(f"[Transcript API] Direct transcript not available for {video_id}: {e}")
+    return ""
+
+
 def download_youtube_audio(url: str) -> str:
     output_template = os.path.join(DOWNLOAD_DIR, "%(id)s.%(ext)s")
     
@@ -47,7 +80,7 @@ def download_youtube_audio(url: str) -> str:
         "noplaylist": True,
         "extractor_args": {
             "youtube": {
-                "player_client": ["web", "mweb", "tv"]
+                "player_client": ["android", "ios", "web"]
             }
         },
         "http_headers": {
@@ -64,7 +97,10 @@ def download_youtube_audio(url: str) -> str:
     }
 
     if cookie_file and os.path.exists(cookie_file):
+        print(f"[yt-dlp] Using YouTube cookies from {cookie_file}")
         ydl_opts["cookiefile"] = cookie_file
+    else:
+        print("[yt-dlp] Note: No cookies provided. Cloud hosting IPs may require YOUTUBE_COOKIES.")
 
     if ffmpeg_dir:
         ydl_opts["ffmpeg_location"] = ffmpeg_dir
