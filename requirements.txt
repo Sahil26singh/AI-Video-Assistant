@@ -1,8 +1,7 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 
 # ── Audio / Video Acquisition & Processing ────────────────────────────────────
-yt-dlp>=2024.4.9                  # Audio extraction from YouTube URLs
-youtube-transcript-api>=0.6.2     # Fast direct YouTube transcript extraction
+yt-dlp>=2024.4.9                  # Audio extraction & transcript extraction from YouTube URLs
 pydub>=0.25.1                     # Audio file manipulation, chunking & format conversion
 
 # ── Speech-to-Text (STT) ───────────────────────────────────────────────────────

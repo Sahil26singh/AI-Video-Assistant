@@ -23,11 +23,15 @@ def extract_video_id(url: str) -> str:
     return match.group(1) if match else ""
 
 
-def _get_transcript_via_ytdlp(url: str) -> str:
+def get_youtube_transcript(url: str) -> str:
     """
-    Extract transcript directly using yt-dlp with mobile client simulation (android/ios).
-    Bypasses cloud IP bans on AWS/Streamlit Cloud since YouTube does not block mobile client endpoints.
+    Fetch YouTube transcripts directly via yt-dlp mobile client simulation.
+    Bypasses datacenter/cloud IP blocks (AWS, Streamlit Cloud) without needing third-party scrapers.
     """
+    video_id = extract_video_id(url)
+    if not video_id:
+        return ""
+
     ydl_opts = {
         "skip_download": True,
         "extractor_args": {
@@ -39,6 +43,8 @@ def _get_transcript_via_ytdlp(url: str) -> str:
         "no_warnings": True,
     }
     try:
+        import requests
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             subs = info.get("subtitles") or {}
@@ -63,7 +69,6 @@ def _get_transcript_via_ytdlp(url: str) -> str:
             if not json_fmt or "url" not in json_fmt:
                 return ""
 
-            import requests
             resp = requests.get(json_fmt["url"], timeout=10)
             if resp.status_code != 200:
                 return ""
@@ -78,7 +83,7 @@ def _get_transcript_via_ytdlp(url: str) -> str:
                             lines.append(t)
                 text = " ".join(lines).strip()
                 if text:
-                    print(f"[yt-dlp Mobile Fallback] Successfully fetched direct transcript ({len(text)} chars).")
+                    print(f"[Transcript API] Successfully fetched direct transcript ({len(text)} chars).")
                     return text
             elif resp.text:
                 import re
@@ -86,72 +91,11 @@ def _get_transcript_via_ytdlp(url: str) -> str:
                 cleaned = re.sub(r"\d{2}:\d{2}:\d{2}[.,]\d+ --> \d{2}:\d{2}:\d{2}[.,]\d+", " ", cleaned)
                 text = " ".join(cleaned.split()).strip()
                 if text:
-                    print(f"[yt-dlp Mobile Fallback] Successfully parsed raw caption text ({len(text)} chars).")
+                    print(f"[Transcript API] Successfully parsed caption stream ({len(text)} chars).")
                     return text
     except Exception as e:
-        print(f"[yt-dlp Mobile Fallback] Direct transcript extraction failed: {e}")
+        print(f"[Transcript API] Direct transcript extraction failed for {video_id}: {e}")
     return ""
-
-
-def get_youtube_transcript(url: str) -> str:
-    """
-    Attempt to fetch official or auto-generated YouTube transcripts directly.
-    Layer 1: youtube-transcript-api (fastest, localhost)
-    Layer 2: yt-dlp android/ios player client (bypasses cloud datacenter IP blocks)
-    """
-    video_id = extract_video_id(url)
-    if not video_id:
-        return ""
-
-    # ── Layer 1: youtube-transcript-api ──────────────────────────────────────
-    try:
-        import requests
-        from youtube_transcript_api import YouTubeTranscriptApi
-
-        session = requests.Session()
-        session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
-        })
-
-        ytta = YouTubeTranscriptApi(http_client=session)
-
-        snippets = None
-        # 1. First attempt: iterate through all available transcripts
-        try:
-            t_list = ytta.list(video_id)
-            for t in t_list:
-                try:
-                    snippets = t.fetch()
-                    if snippets:
-                        break
-                except Exception:
-                    continue
-        except Exception:
-            pass
-
-        # 2. Fallback: try fetching with explicit language list
-        if not snippets:
-            for lang_code in ["en", "hi", "en-US", "en-GB"]:
-                try:
-                    snippets = ytta.fetch(video_id, languages=[lang_code])
-                    if snippets:
-                        break
-                except Exception:
-                    continue
-
-        if snippets:
-            text = " ".join(getattr(s, "text", "") if not isinstance(s, dict) else s.get("text", "") for s in snippets)
-            cleaned = text.strip()
-            if cleaned:
-                print(f"[Transcript API] Successfully fetched direct YouTube transcript ({len(cleaned)} chars).")
-                return cleaned
-    except Exception as e:
-        print(f"[Transcript API] Layer 1 failed for {video_id}: {e}")
-
-    # ── Layer 2: yt-dlp with mobile client simulation ─────────────────────────
-    # Bypasses cloud IP bans (Streamlit Cloud, Render, AWS)
-    return _get_transcript_via_ytdlp(url)
 
 
 def download_youtube_audio(url: str) -> str:
