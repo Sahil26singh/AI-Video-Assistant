@@ -160,7 +160,7 @@ with st.sidebar:
     st.divider()
 
     banner("1. Select input source")
-    source_type = st.radio("Source", ["YouTube URL", "Upload File"], horizontal=True, label_visibility="collapsed")
+    source_type = st.radio("Source", ["YouTube URL", "Upload File"], horizontal=True, label_visibility="collapsed", index=1)
     youtube_url, uploaded = "", None
     if source_type == "YouTube URL":
         youtube_url = st.text_input("YouTube link", placeholder="https://www.youtube.com/watch?v=...",
