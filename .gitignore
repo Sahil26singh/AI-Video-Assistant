@@ -1,8 +1,6 @@
 # Environment & Secrets
 .env
 .venv/
-cookies.txt
-*cookies*.txt
 
 # Cache & Compiled Files
 __pycache__/

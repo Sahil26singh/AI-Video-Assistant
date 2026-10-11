@@ -28,35 +28,58 @@ st.set_page_config(
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap');
-:root { --text:#26231F; --muted:#6B645B; --border:#E7E1D8; --accent:#6D28D9; --soft:#EDE9FE; }
+:root { 
+    --text: #1E1B18; 
+    --muted: #6B645B; 
+    --border: #E5DFD7; 
+    --card-bg: #FFFFFF;
+    --metric-bg: #F4EFEA;
+    --accent: #6D28D9; 
+    --soft: #EDE9FE; 
+}
+
 .stApp { font-family:'Inter',sans-serif; color:var(--text); }
 h1,h2,h3,h4,h5 { font-family:'Syne',sans-serif !important; letter-spacing:-0.02em; color:var(--text) !important; }
 [data-testid="stDecoration"] { background:var(--accent) !important; height:3px !important; }
 code { color:var(--accent) !important; background:var(--soft) !important; border-radius:6px; }
 
 /* hero */
-.hero { font:800 clamp(2.2rem,4.5vw,3.3rem)/1.1 'Syne',sans-serif; text-align:center;
-        background:linear-gradient(135deg,#26231F,#6D28D9 55%,#0E7490);
-        -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.hero { 
+    font: 800 clamp(2.2rem, 4.2vw, 3.2rem)/1.15 'Syne', sans-serif; 
+    text-align: center;
+    color: var(--text);
+    letter-spacing: -0.025em;
+}
 .hero-sub { text-align:center; color:var(--muted); font-size:.95rem; margin:.4rem 0 1.5rem; }
 
 /* cards */
-[data-testid="stVerticalBlockBorderWrapper"] { background:#fff; border:1px solid var(--border);
-    border-radius:12px; box-shadow:0 1px 3px rgba(38,35,31,.05); transition:.2s; }
-[data-testid="stVerticalBlockBorderWrapper"]:hover { border-color:#D5CDC1; box-shadow:0 4px 12px rgba(38,35,31,.08); }
+[data-testid="stVerticalBlockBorderWrapper"] { background:var(--card-bg); border:1px solid var(--border);
+    border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,.08); transition:.2s; }
+[data-testid="stVerticalBlockBorderWrapper"]:hover { border-color:var(--accent); box-shadow:0 4px 12px rgba(0,0,0,.15); }
 
-/* colored banner headers */
-.banner { border:1px solid; border-radius:8px; padding:.5rem .85rem; margin-bottom:.85rem;
-          font:700 .82rem 'Syne',sans-serif; letter-spacing:.05em; text-transform:uppercase; }
-.banner small { display:block; font:400 .8rem 'Inter',sans-serif; text-transform:none; letter-spacing:0; opacity:.88; margin-top:3px; }
-.purple { background:#EDE9FE; color:#6D28D9; border-color:#DDD6FE; }
-.amber  { background:#FEF3C7; color:#B45309; border-color:#FDE68A; }
-.cyan   { background:#E0F2FE; color:#0E7490; border-color:#BAE6FD; }
-.indigo { background:#E0E7FF; color:#4338CA; border-color:#C7D2FE; }
-.green  { background:#DCFCE7; color:#15803D; border-color:#BBF7D0; }
+/* plain section labels */
+.section-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0.15rem 0 0.5rem 0;
+    line-height: 1.4;
+}
+.section-label .sub {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--muted);
+    opacity: 0.85;
+    margin-top: 2px;
+}
 
 /* headings inside generated content */
-.stMarkdown h2, .stMarkdown h3 { background:linear-gradient(135deg,rgba(109,40,217,.08),rgba(14,116,144,.04));
+.stMarkdown h2, .stMarkdown h3 { background:linear-gradient(135deg,rgba(109,40,217,.08),rgba(109,40,217,.02));
     border-left:4px solid var(--accent); padding:.4rem .8rem !important; border-radius:0 8px 8px 0; }
 .stMarkdown h2, .stMarkdown h3 { margin:.5rem 0 .6rem !important; line-height:1.3 !important; }
 .stMarkdown h4, .stMarkdown h5 { color:var(--accent) !important; margin-top:.85rem !important; }
@@ -64,29 +87,25 @@ code { color:var(--accent) !important; background:var(--soft) !important; border
 
 /* pill tabs */
 [role="tablist"] { gap:8px; border-bottom:1px solid var(--border); padding-bottom:8px; }
-[role="tab"] { height:42px; padding:0 18px; border-radius:999px; background:#F0FDF4; border:1px solid #BBF7D0; }
-[role="tab"] p { font-size:1.02rem; font-weight:600; color:#166534; margin:0; }
-[role="tab"]:hover { background:#DCFCE7; border-color:#86EFAC; }
-[role="tab"][aria-selected="true"] { background:#15803D; border-color:#15803D; }
-[role="tab"][aria-selected="true"] p { color:#fff; }
+[role="tab"] { height:40px; padding:0 18px; border-radius:999px; background:var(--card-bg); border:1px solid var(--border); }
+[role="tab"] p { font-size:0.95rem; font-weight:600; color:var(--text); margin:0; }
+[role="tab"]:hover { background:var(--soft); border-color:var(--accent); }
+[role="tab"][aria-selected="true"] { background:var(--accent); border-color:var(--accent); }
+[role="tab"][aria-selected="true"] p { color:#fff !important; }
 [role="tablist"] .react-aria-SelectionIndicator, [role="tablist"] [data-baseweb="tab-highlight"],
 [role="tablist"] [data-baseweb="tab-border"] { display:none !important; }
 [role="tab"], [role="tab"]:focus, [role="tab"]:focus-visible, [role="tab"]:active { outline:none !important; box-shadow:none !important; }
 
 /* metrics */
-[data-testid="stMetric"] { background:#fff; border:1px solid var(--border); border-radius:10px; padding:1rem; display:flex; flex-direction:column; align-items:center; text-align:center; gap:.9rem; }
+[data-testid="stMetric"] { background:var(--card-bg); border:1px solid var(--border); border-radius:10px; padding:1rem; display:flex; flex-direction:column; align-items:center; text-align:center; gap:.9rem; }
 [data-testid="stMetric"] > div, [data-testid="stMetricLabel"], [data-testid="stMetricValue"] { justify-content:center; text-align:center; width:100%; }
-[data-testid="stMetricLabel"] { background:#F3EFE9; color:var(--muted) !important; font-size:.72rem !important; font-weight:600;
+[data-testid="stMetricLabel"] { background:var(--metric-bg); color:var(--muted) !important; font-size:.72rem !important; font-weight:600;
     text-transform:uppercase; letter-spacing:.05em; padding:.2rem .55rem; border-radius:4px; display:inline-block; }
-[data-testid="stMetricValue"] { font-size:1.4rem !important; font-weight:600 !important; font-variant-numeric:tabular-nums; line-height:1.3 !important; }
+[data-testid="stMetricValue"] { font-size:1.4rem !important; font-weight:600 !important; font-variant-numeric:tabular-nums; line-height:1.3 !important; color:var(--text) !important; }
 
 /* sidebar */
 [data-testid="stSidebar"][aria-expanded="true"] { min-width:340px; max-width:340px; }
 [data-testid="stSidebar"] [role="radiogroup"] { gap:10px; }
-
-/* empty state */
-.badge { display:inline-block; padding:.25rem .65rem; border-radius:6px; font:600 .72rem 'Inter',sans-serif;
-         letter-spacing:.05em; text-transform:uppercase; border:1px solid; margin:0 .3rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -95,14 +114,14 @@ for k, v in {"result": None, "chat": [], "source": ""}.items():
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────────────
-def banner(title, sub="", theme="purple"):
-    s = f"<small>{sub}</small>" if sub else ""
-    st.markdown(f'<div class="banner {theme}">{title}{s}</div>', unsafe_allow_html=True)
+def banner(title, sub="", **kwargs):
+    s = f'<span class="sub">{sub}</span>' if sub else ""
+    st.markdown(f'<div class="section-label">{title}{s}</div>', unsafe_allow_html=True)
 
 
-def card(title, body, theme="purple"):
+def card(title, body, **kwargs):
     with st.container(border=True):
-        banner(title, theme=theme)
+        banner(title)
         st.markdown(body)
 
 
@@ -146,6 +165,20 @@ def actions_to_df(text):
     return pd.DataFrame(rows)
 
 
+def run_audio_pipeline(source_path: str, lang: str):
+    """Normalize, chunk, and transcribe an audio file with progress updates."""
+    st.markdown(":material/graphic_eq: **Step 1/5 · Audio preparation** — normalizing and chunking")
+    chunks, duration_sec = process_input(source_path)
+    prog = st.empty()
+
+    def on_progress(cur, total):
+        prog.markdown(f":material/transcribe: **Step 2/5 · Transcription** — chunk {cur} of {total} via {lang.capitalize()}")
+
+    on_progress(1, len(chunks))
+    text = transcribe_all(chunks, lang, on_progress=on_progress)
+    return text, len(chunks), duration_sec
+
+
 # ─── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     if os.path.exists(LOGO):
@@ -155,9 +188,10 @@ with st.sidebar:
     else:
         st.markdown("### AI Video Assistant\nVideo Intelligence & RAG Chat")
 
-    if st.session_state.result and st.button("New analysis", icon=":material/refresh:", width="stretch"):
-        reset()
-    st.divider()
+    if st.session_state.result:
+        if st.button("New analysis", icon=":material/refresh:", width="stretch"):
+            reset()
+        st.divider()
 
     banner("1. Select input source")
     source_type = st.radio("Source", ["YouTube URL", "Upload File"], horizontal=True, label_visibility="collapsed", index=1)
@@ -169,7 +203,7 @@ with st.sidebar:
         uploaded = st.file_uploader("Audio / video file", help="Choose a file from your computer.",
                                     type=["mp3", "wav", "mp4", "m4a", "mkv", "webm", "aac", "ogg", "flac"])
 
-    banner("2. Transcription engine", theme="cyan")
+    banner("2. Transcription engine")
     language = st.radio(
         "Engine", ["english", "hinglish"], label_visibility="collapsed",
         format_func=lambda x: "English / Global (Groq Whisper)" if x == "english" else "Hinglish / Hindi (Sarvam AI)",
@@ -192,20 +226,22 @@ if run:
             st.error("Please provide a valid YouTube URL.")
     elif uploaded:
         tmp = tempfile.mkdtemp(prefix="vid_upload_")
-        target = os.path.join(tmp, uploaded.name)
+        safe_name = os.path.basename(uploaded.name)
+        target = os.path.join(tmp, safe_name)
         with open(target, "wb") as f:
             f.write(uploaded.getbuffer())
-        name = uploaded.name
+        name = safe_name
     else:
         st.error("Please upload an audio or video file.")
 
     if target:
         st.session_state.update(result=None, chat=[], source=name)
         try:
-            with st.status("Processing video intelligence pipeline...", expanded=True) as status:
+            with st.status("Video processing pipeline...", expanded=True) as status:
                 transcript = ""
                 chunks_count = 0
                 duration = 0.0
+                mode = "audio"
 
                 # 1. Fast track: Attempt direct YouTube transcript first (bypasses 403 Forbidden & quotas)
                 if source_type == "YouTube URL":
@@ -214,19 +250,29 @@ if run:
                     if direct_transcript:
                         transcript = direct_transcript
                         chunks_count = 1
+                        mode = "captions"
                         st.markdown(":material/check_circle: **Native transcript loaded** — bypassed audio download & quotas!")
 
                 # 2. Fallback: Full audio extraction & AI transcription pipeline
                 if not transcript:
-                    st.markdown(":material/graphic_eq: **Step 1/5 · Audio preparation** — normalizing and chunking")
-                    chunks, duration = process_input(target)
-                    chunks_count = len(chunks)
-
-                    prog = st.empty()
-                    def on_progress(cur, total):
-                        prog.markdown(f":material/transcribe: **Step 2/5 · Transcription** — chunk {cur} of {total} via {language.capitalize()}")
-                    on_progress(1, len(chunks))
-                    transcript = transcribe_all(chunks, language, on_progress=on_progress)
+                    if source_type == "YouTube URL":
+                        st.markdown(":material/graphic_eq: Falling back to audio extraction & speech model...")
+                        try:
+                            transcript, chunks_count, duration = run_audio_pipeline(target, language)
+                        except Exception as e:
+                            status.update(label="YouTube captions unavailable", state="error", expanded=False)
+                            st.warning(
+                                "**No captions available. Upload the file instead.**\n\n"
+                                "This YouTube video has captions disabled or is restricted by YouTube (e.g., private, age-restricted, or cloud IP limits).\n\n"
+                                "**Recommended path:** Switch to **Upload File** in the sidebar and upload the file directly. "
+                                "File upload does not depend on YouTube and processes media directly.",
+                                icon=":material/subtitles_off:"
+                            )
+                            with st.expander("Technical details"):
+                                st.code(str(e))
+                            st.stop()
+                    else:
+                        transcript, chunks_count, duration = run_audio_pipeline(target, language)
 
                 st.markdown(":material/title: **Step 3/5 · Title** — generating video title")
                 title = generate_title(transcript)
@@ -244,13 +290,22 @@ if run:
                 "action_items": ex["action_items"], "key_decisions": ex["key_decisions"],
                 "open_questions": ex["open_questions"], "rag_chain": rag_chain,
                 "chunks": chunks_count, "duration": duration, "language": language,
+                "mode": mode,
             }
             st.toast("Analysis complete", icon=":material/check_circle:")
             st.rerun()
         except Exception as e:
-            st.error(f"Pipeline execution failed: {e}")
-            with st.expander("View error details"):
-                st.exception(e)
+            err_text = str(e).lower()
+            if "rate limit" in err_text or "429" in err_text:
+                st.error(
+                    "**LLM Rate Limit Reached.** Groq/Mistral rate limit was reached. "
+                    "Please wait 30 seconds and try again.",
+                    icon=":material/hourglass_empty:"
+                )
+            elif "groq_api_key" in err_text or "api key" in err_text:
+                st.error(f"**API Key Configuration Error:** {e}", icon=":material/key_off:")
+            else:
+                st.error(f"Analysis could not be completed: {e}")
         finally:
             if tmp:
                 shutil.rmtree(tmp, ignore_errors=True)
@@ -259,24 +314,41 @@ if run:
 r = st.session_state.result
 if not r:
     with st.container(border=True):
-        if os.path.exists(LOGO):
-            _, mid, _ = st.columns([2, 1, 2])
-            mid.image(LOGO, width=140)
         st.markdown("""
-        <div style="text-align:center;padding:1rem 1rem 2rem">
-          <div style="font:700 1.6rem 'Syne',sans-serif;margin-bottom:.5rem">Ready to transcribe &amp; analyze</div>
-          <div style="color:#6B645B;max-width:480px;margin:0 auto 1.5rem;line-height:1.6">
-            Enter a YouTube link or upload a file in the sidebar, pick your engine, and click <b>Run analysis</b>.</div>
-          <span class="badge purple">Whisper / Sarvam STT</span>
-          <span class="badge cyan">Structured summaries</span>
-          <span class="badge green">ChromaDB RAG chat</span>
+        <div style="text-align:center;padding:2.5rem 1rem 2rem">
+          <div style="font:700 1.55rem 'Syne',sans-serif;margin-bottom:.4rem;color:var(--text)">
+            Ready to transcribe &amp; analyze
+          </div>
+          <div style="color:var(--muted);max-width:500px;margin:0 auto 1.2rem;line-height:1.6;font-size:0.95rem">
+            Upload an audio/video file or enter a YouTube link in the sidebar to extract structured intelligence, action items, and interactive Q&amp;A.
+          </div>
+          <div style="color:var(--accent);font-weight:600;font-size:0.84rem;letter-spacing:0.04em;text-transform:uppercase">
+            Summary &nbsp;·&nbsp; Action Items &nbsp;·&nbsp; Interactive Q&amp;A
+          </div>
         </div>""", unsafe_allow_html=True)
     st.stop()
 
 # ─── Results ────────────────────────────────────────────────────────────────────
-if r["language"] == "english" and looks_non_english(r["transcript"]):
-    st.warning("High proportion of non-Latin characters detected. If this is Hindi/Hinglish audio, "
-               "re-run with 'Hinglish / Hindi (Sarvam AI)' for better accuracy.")
+if r.get("mode") == "captions" and r["language"] == "hinglish":
+    st.info(
+        "Direct YouTube captions were loaded. Sarvam AI's speech translation runs on uploaded audio tracks; "
+        "to translate spoken Hindi/Hinglish directly from audio with Sarvam, download the audio and use **Upload File** in the sidebar.",
+        icon=":material/info:"
+    )
+elif r["language"] == "english" and looks_non_english(r["transcript"]):
+    if r.get("mode") == "captions":
+        st.info(
+            "**Hindi / Devanagari text detected in YouTube transcript.** "
+            "YouTube provided native Hindi subtitles. If you want spoken Hindi translated to English audio text, "
+            "download the audio file and upload it with the **'Hinglish / Hindi (Sarvam AI)'** engine.",
+            icon=":material/info:"
+        )
+    else:
+        st.warning(
+            "High proportion of non-Latin characters detected. If this is Hindi/Hinglish audio, "
+            "re-run with 'Hinglish / Hindi (Sarvam AI)' for better accuracy.",
+            icon=":material/warning:"
+        )
 
 with st.container(border=True):
     banner("Session title")
@@ -286,8 +358,13 @@ with st.container(border=True):
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("Words", f"{len(r['transcript'].split()):,}")
 m2.metric("Characters", f"{len(r['transcript']):,}")
-m3.metric("Audio chunks", r["chunks"])
-m4.metric("Duration", fmt_duration(r["duration"]))
+if r.get("mode") == "captions":
+    m3.metric("Source Mode", "Direct Captions")
+    est_read_min = max(1, round(len(r['transcript'].split()) / 180))
+    m4.metric("Est. Read Time", f"~{est_read_min} min")
+else:
+    m3.metric("Audio chunks", r["chunks"])
+    m4.metric("Duration", fmt_duration(r["duration"]))
 st.write("")
 
 t_sum, t_act, t_key, t_q, t_tr = st.tabs(
@@ -299,21 +376,21 @@ with t_sum:
 with t_act:
     df = actions_to_df(r["action_items"])
     if df.empty:
-        card("Action items & task owners", r["action_items"], "amber")
+        card("Action items & task owners", r["action_items"])
     else:
         with st.container(border=True):
-            banner("Action items & task owners", theme="amber")
+            banner("Action items & task owners")
             st.dataframe(df, hide_index=True, width="stretch")
 
 with t_key:
-    card("Key takeaways", r["key_decisions"], "cyan")
+    card("Key takeaways", r["key_decisions"])
 
 with t_q:
-    card("Questions & follow-ups", r["open_questions"], "amber")
+    card("Questions & follow-ups", r["open_questions"])
 
 with t_tr:
     with st.container(border=True):
-        banner("Full transcript", theme="indigo")
+        banner("Full transcript")
         st.container(height=400).text(r["transcript"])
     report = (
         f"# {r['title']}\n\nGenerated by AI Video Assistant\nSource: {st.session_state.source}\n\n---\n\n"

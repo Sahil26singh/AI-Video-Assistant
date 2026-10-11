@@ -49,50 +49,62 @@ def get_youtube_transcript(url: str) -> str:
             info = ydl.extract_info(url, download=False)
             subs = info.get("subtitles") or {}
             auto = info.get("automatic_captions") or {}
-            all_subs = {**auto, **subs}
-            if not all_subs:
+            if not subs and not auto:
                 return ""
 
-            target_lang = None
+            # Candidate tracks in priority order:
+            # 1. Manual human subtitles (matching en or hi first, then any other)
+            # 2. Native auto-captions (where YouTube hasn't auto-translated with 'tlang=')
+            # 3. Fallback: Any remaining auto-captions
+            candidates = []
             for l in ["en", "en-US", "en-GB", "hi"]:
-                if l in all_subs:
-                    target_lang = l
-                    break
-            if not target_lang:
-                target_lang = next(iter(all_subs.keys()))
+                if l in subs:
+                    candidates.append((l, subs[l]))
+            for l, fmts in subs.items():
+                if (l, fmts) not in candidates:
+                    candidates.append((l, fmts))
 
-            formats = all_subs.get(target_lang, [])
-            json_fmt = next((f for f in formats if f.get("ext") == "json3"), None)
-            if not json_fmt and formats:
-                json_fmt = formats[0]
+            for l, fmts in auto.items():
+                is_translated = any("tlang=" in f.get("url", "") for f in fmts)
+                if not is_translated:
+                    candidates.insert(0 if l in ["en", "hi"] else len(candidates), (l, fmts))
 
-            if not json_fmt or "url" not in json_fmt:
-                return ""
+            for l in ["en", "hi"]:
+                if l in auto and (l, auto[l]) not in candidates:
+                    candidates.append((l, auto[l]))
 
-            resp = requests.get(json_fmt["url"], timeout=10)
-            if resp.status_code != 200:
-                return ""
+            for lang_code, formats in candidates:
+                json_fmt = next((f for f in formats if f.get("ext") == "json3"), formats[0] if formats else None)
+                if not json_fmt or "url" not in json_fmt:
+                    continue
 
-            if json_fmt.get("ext") == "json3":
-                data = resp.json()
-                lines = []
-                for ev in data.get("events", []):
-                    for seg in ev.get("segs", []):
-                        t = seg.get("utf8", "").strip()
-                        if t and t != "\n":
-                            lines.append(t)
-                text = " ".join(lines).strip()
-                if text:
-                    print(f"[Transcript API] Successfully fetched direct transcript ({len(text)} chars).")
-                    return text
-            elif resp.text:
-                import re
-                cleaned = re.sub(r"<[^>]+>", " ", resp.text)
-                cleaned = re.sub(r"\d{2}:\d{2}:\d{2}[.,]\d+ --> \d{2}:\d{2}:\d{2}[.,]\d+", " ", cleaned)
-                text = " ".join(cleaned.split()).strip()
-                if text:
-                    print(f"[Transcript API] Successfully parsed caption stream ({len(text)} chars).")
-                    return text
+                try:
+                    resp = requests.get(json_fmt["url"], timeout=10)
+                    if resp.status_code != 200:
+                        continue
+
+                    if json_fmt.get("ext") == "json3":
+                        data = resp.json()
+                        lines = []
+                        for ev in data.get("events", []):
+                            for seg in ev.get("segs", []):
+                                t = seg.get("utf8", "").strip()
+                                if t and t != "\n":
+                                    lines.append(t)
+                        text = " ".join(lines).strip()
+                        if text:
+                            print(f"[Transcript API] Successfully fetched direct transcript in '{lang_code}' ({len(text)} chars).")
+                            return text
+                    elif resp.text:
+                        import re
+                        cleaned = re.sub(r"<[^>]+>", " ", resp.text)
+                        cleaned = re.sub(r"\d{2}:\d{2}:\d{2}[.,]\d+ --> \d{2}:\d{2}:\d{2}[.,]\d+", " ", cleaned)
+                        text = " ".join(cleaned.split()).strip()
+                        if text:
+                            print(f"[Transcript API] Successfully parsed caption stream in '{lang_code}' ({len(text)} chars).")
+                            return text
+                except Exception:
+                    continue
     except Exception as e:
         print(f"[Transcript API] Direct transcript extraction failed for {video_id}: {e}")
     return ""
@@ -193,4 +205,3 @@ def process_input(source: str) -> tuple:
     chunks, duration_sec = chunk_audio(wav_path, chunk_minutes=8)
     print(f"Audio ready — {len(chunks)} chunk(s) created (duration: {duration_sec:.1f}s).")
     return chunks, duration_sec
-

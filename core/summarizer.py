@@ -99,7 +99,3 @@ def generate_title(transcript: str) -> str:
 
     time.sleep(1)
     return safe_invoke(title_chain, {"text": transcript[:2000]})
-
-
-
-

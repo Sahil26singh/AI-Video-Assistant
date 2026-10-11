@@ -5,7 +5,6 @@ from core.summarizer import summarize, generate_title
 from core.extractor import extract_all
 from core.rag_engine import build_rag_chain, ask_question
 
-
 load_dotenv()
 
 def run_pipeline(source :str, language :str = "english") -> dict:

@@ -10,7 +10,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-MAX_SINGLE_CALL_CHARS = 15_000   # ~4k tokens, safer for free models and rate limits
+MAX_SINGLE_CALL_CHARS = 15_000   # ~4k tokens, safe for free model
 
 EXTRACT_PROMPT = """You are an expert video content analyst. Read the video transcript and produce EXACTLY these three sections, in this order, using these exact headers:
 
@@ -87,12 +87,11 @@ def _parse_sections(text: str) -> dict:
     result = {}
     for key, _, default in SECTIONS:
         content = out.get(key, "")
-        # Only treat as empty if the WHOLE section is the "none found" line
+        #treat as empty if "none found" 
         if not content or re.fullmatch(r"[\W_]*none found\.?[\W_]*", content, re.IGNORECASE):
             content = default
         result[key] = content
 
-    # Model ignored the headers entirely: keep its answer instead of losing it
     if not positions and text.strip():
         result["key_decisions"] = text.strip()
     return result
@@ -116,7 +115,7 @@ def _merge_lines(blocks: list, default: str) -> str:
         if block == default:
             continue
         for line in block.splitlines():
-            clean = re.sub(r"^\s*\d+[\.\)]\s*", "", line).strip()   # strip old numbering
+            clean = re.sub(r"^\s*\d+[\.\)]\s*", "", line).strip()   # strip numbering
             if clean and clean.lower() not in seen:
                 seen.add(clean.lower())
                 lines.append(clean)

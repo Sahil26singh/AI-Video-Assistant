@@ -7,7 +7,6 @@ from langchain_core.documents import Document
 
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
-
 @lru_cache(maxsize=1)
 def get_embeddings():
     return HuggingFaceEmbeddings(
@@ -29,7 +28,7 @@ def build_vector_store(transcript: str) -> Chroma:
     return Chroma.from_documents(
         documents=docs,
         embedding=get_embeddings(),
-        collection_name=f"video_{uuid.uuid4().hex}",   # unique per analysis (in-memory)
+        collection_name=f"video_{uuid.uuid4().hex}",   # unique per analysis
     )
 
 

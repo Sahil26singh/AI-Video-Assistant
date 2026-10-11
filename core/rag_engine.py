@@ -44,7 +44,6 @@ def get_llm(temperature=0.3):
         timeout=120,
     )
 
-
 def format_docs(docs):
     print(f"\n--- DEBUG: Retrieved {len(docs)} Chunks ---")
     for i, doc in enumerate(docs):
