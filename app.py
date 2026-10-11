@@ -64,7 +64,7 @@ code { color:var(--accent) !important; background:var(--soft) !important; border
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--muted);
-    margin: 0.15rem 0 0.5rem 0;
+    margin: 1.5rem 0 0.6rem 0;
     line-height: 1.4;
 }
 .section-label .sub {
@@ -78,11 +78,25 @@ code { color:var(--accent) !important; background:var(--soft) !important; border
     margin-top: 2px;
 }
 
-/* headings inside generated content */
-.stMarkdown h2, .stMarkdown h3 { background:linear-gradient(135deg,rgba(109,40,217,.08),rgba(109,40,217,.02));
-    border-left:4px solid var(--accent); padding:.4rem .8rem !important; border-radius:0 8px 8px 0; }
-.stMarkdown h2, .stMarkdown h3 { margin:.5rem 0 .6rem !important; line-height:1.3 !important; }
-.stMarkdown h4, .stMarkdown h5 { color:var(--accent) !important; margin-top:.85rem !important; }
+/* headings inside generated content (scoped to main content area) */
+[data-testid="stMain"] .stMarkdown h2,
+[data-testid="stMain"] .stMarkdown h3,
+.main .stMarkdown h2,
+.main .stMarkdown h3 {
+    background: linear-gradient(135deg,rgba(109,40,217,.08),rgba(109,40,217,.02));
+    border-left: 4px solid var(--accent);
+    padding: .4rem .8rem !important;
+    border-radius: 0 8px 8px 0;
+    margin: .5rem 0 .6rem !important;
+    line-height: 1.3 !important;
+}
+[data-testid="stMain"] .stMarkdown h4,
+[data-testid="stMain"] .stMarkdown h5,
+.main .stMarkdown h4,
+.main .stMarkdown h5 {
+    color: var(--accent) !important;
+    margin-top: .85rem !important;
+}
 [data-testid="stCaptionContainer"] { margin-top:.6rem; }
 
 /* pill tabs */
@@ -105,7 +119,8 @@ code { color:var(--accent) !important; background:var(--soft) !important; border
 
 /* sidebar */
 [data-testid="stSidebar"][aria-expanded="true"] { min-width:340px; max-width:340px; }
-[data-testid="stSidebar"] [role="radiogroup"] { gap:10px; }
+[data-testid="stSidebar"] [role="radiogroup"] { gap:14px; }
+[data-testid="stSidebar"] .stButton { margin-top:1rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -191,7 +206,7 @@ with st.sidebar:
     if st.session_state.result:
         if st.button("New analysis", icon=":material/refresh:", width="stretch"):
             reset()
-        st.divider()
+    st.divider()
 
     banner("1. Select input source")
     source_type = st.radio("Source", ["YouTube URL", "Upload File"], horizontal=True, label_visibility="collapsed", index=1)
