@@ -18,7 +18,12 @@ def get_embeddings():
 def build_vector_store(transcript: str) -> Chroma:
     print("Building vector store")
 
-    splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=800,
+        chunk_overlap=100,
+        separators=["\n\n", "\n", ". ", "? ", "! ", "; ", " ", ""],
+        keep_separator="end",
+    )
     chunks = splitter.split_text(transcript)
     docs = [
         Document(page_content=chunk, metadata={"chunk_index": i})

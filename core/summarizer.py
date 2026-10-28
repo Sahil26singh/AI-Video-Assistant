@@ -28,7 +28,9 @@ def get_llm(temperature=0.3):
 def split_transcript(transcript: str) -> list:
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=3000,
-        chunk_overlap=200
+        chunk_overlap=200,
+        separators=["\n\n", "\n", ". ", "? ", "! ", "; ", " ", ""],
+        keep_separator="end",
     )
     return splitter.split_text(transcript)
 
