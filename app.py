@@ -215,8 +215,9 @@ with st.sidebar:
         youtube_url = st.text_input("YouTube link", placeholder="https://www.youtube.com/watch?v=...",
                                     help="Paste any public YouTube link.")
     else:
-        uploaded = st.file_uploader("Audio / video file", help="Choose a file from your computer.",
+        uploaded = st.file_uploader("Audio / video file", help="Choose a file (audio/video) from your Device.",
                                     type=["mp3", "wav", "mp4", "m4a", "mkv", "webm", "aac", "ogg", "flac"])
+        st.caption("**Tip:** Audio (`.mp3`, `.m4a`) finishes faster than video.")
 
     banner("2. Transcription engine")
     language = st.radio(

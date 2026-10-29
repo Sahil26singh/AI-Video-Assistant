@@ -1,8 +1,10 @@
 import os
 import shutil
 import glob
+import subprocess
+import wave
 
-# Ensure ffmpeg path is available to pydub and yt-dlp
+# Ensure ffmpeg path is available to yt-dlp and ffmpeg subprocesses
 if not shutil.which("ffmpeg"):
     possible_paths = glob.glob(r"C:\Users\*\AppData\Local\Microsoft\WinGet\Packages\*FFmpeg*\*\bin") + \
                      glob.glob(r"C:\Users\*\AppData\Local\Microsoft\WinGet\Packages\*FFmpeg*")
@@ -12,7 +14,6 @@ if not shutil.which("ffmpeg"):
             break
 
 import yt_dlp
-from pydub import AudioSegment
 
 DOWNLOAD_DIR = 'downloades'
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
@@ -156,37 +157,62 @@ def download_youtube_audio(url: str) -> str:
         return wav_name
 
 
-
 def convert_to_wav(input_path: str) -> str:
-    """Convert any audio/video file to WAV format using pydub."""
+    """Convert any audio/video file to 16kHz mono WAV format using FFmpeg directly (low RAM streaming)."""
     output_path = os.path.splitext(input_path)[0] + "_converted.wav"
-    audio = AudioSegment.from_file(input_path)
-    audio = audio.set_channels(1).set_frame_rate(16000) #16khz
-    audio.export(output_path, format="wav")
+    ffmpeg = shutil.which("ffmpeg") or "ffmpeg"
+    cmd = [
+        ffmpeg, "-y", "-i", input_path,
+        "-vn",                 # Drop video stream
+        "-ac", "1",            # Convert to mono
+        "-ar", "16000",        # Resample to 16 kHz
+        "-c:a", "pcm_s16le",   # Standard 16-bit uncompressed WAV
+        output_path
+    ]
+    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return output_path
 
 
-
 def chunk_audio(wav_path: str, chunk_minutes: int = 8) -> tuple:
-    audio = AudioSegment.from_wav(wav_path)
-    total_duration_sec = len(audio) / 1000.0
-    chunk_ms = chunk_minutes * 60 * 1000 
+    """Split WAV audio into chunks using FFmpeg segmenter without loading data into RAM."""
+    chunk_seconds = chunk_minutes * 60
+    base = os.path.splitext(wav_path)[0]
+    output_pattern = f"{base}_chunk_%03d.wav"
+    ffmpeg = shutil.which("ffmpeg") or "ffmpeg"
 
+    # Segment the file on disk directly
+    cmd = [
+        ffmpeg, "-y", "-i", wav_path,
+        "-f", "segment",
+        "-segment_time", str(chunk_seconds),
+        "-c", "copy",
+        output_pattern
+    ]
+    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    raw_chunks = sorted(glob.glob(f"{base}_chunk_[0-9][0-9][0-9].wav"))
+
+    # Filter out empty or tiny trailing fraction chunks
     chunks = []
+    for c in raw_chunks:
+        if os.path.getsize(c) > 1024 or not chunks:
+            chunks.append(c)
+        else:
+            try:
+                os.remove(c)
+            except OSError:
+                pass
 
-    for i, start in enumerate(range(0, len(audio), chunk_ms)):
-        chunk = audio[start: start + chunk_ms]
-        if len(chunk) < 500 and len(chunks) > 0:
-            # Skip tiny trailing fraction chunks if we already have chunks
-            continue
-        chunk_path = f"{wav_path}_chunk_{i}.wav"
-        chunk.export(chunk_path, format="wav")
-        chunks.append(chunk_path)
+    if not chunks:
+        chunks = [wav_path]
 
-    if not chunks and len(audio) > 0:
-        chunk_path = f"{wav_path}_chunk_0.wav"
-        audio.export(chunk_path, format="wav")
-        chunks.append(chunk_path)
+    # Calculate duration from WAV header in <1ms without decoding audio
+    total_duration_sec = 0.0
+    try:
+        with wave.open(wav_path, "rb") as wf:
+            total_duration_sec = wf.getnframes() / float(wf.getframerate())
+    except Exception:
+        pass
 
     return chunks, total_duration_sec
 
