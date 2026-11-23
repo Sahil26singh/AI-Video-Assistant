@@ -15,16 +15,17 @@ MAX_SINGLE_CALL_CHARS = 15_000   # ~4k tokens, safe for free model
 EXTRACT_PROMPT = """You are an expert video content analyst. Read the video transcript and produce EXACTLY these three sections, in this order, using these exact headers:
 
 ### ACTION ITEMS
-### KEY TAKEAWAYS
+### HIGHLIGHTS
 ### OPEN QUESTIONS
 
 Rules for each section:
-- ACTION ITEMS: tasks, to-dos, steps the speaker tells the viewer or team to do, or recommended next steps. One per line, numbered, in the format: Task | Owner | Deadline. Owner is the person named, or "Viewer" for lectures and tutorials. Deadline is "Not specified" if not mentioned.
-- KEY TAKEAWAYS: decisions made, conclusions reached, and the main points to remember. One per line, numbered, specific and concise.
-- OPEN QUESTIONS: unresolved questions, open problems, or topics that need follow-up or further study. One per line, numbered.
+- ACTION ITEMS: tasks, to-dos, steps the speaker tells the viewer or team to do, or recommended next steps. One per line, numbered, in the format: Task | Owner | Deadline | Quote. Owner is the person named, or "Viewer" for lectures and tutorials. Deadline is "Not specified" if not mentioned. Quote is an exact, brief verbatim quote from the transcript proving this task.
+- HIGHLIGHTS: key decisions made, conclusions reached, and the main points to remember. One per line, numbered, in the format: Point | Quote. Quote is an exact, brief verbatim quote from the transcript supporting this highlight.
+- OPEN QUESTIONS: unresolved questions, open problems, or topics that need follow-up or further study. One per line, numbered, in the format: Question | Quote. Quote is an exact, brief verbatim quote from the transcript where this question or issue was raised.
 
 Global rules:
-- Use ONLY information from the transcript. Never invent details.
+- Use ONLY information from the transcript. Never invent details or hallucinate.
+- Every Quote MUST be an exact, word-for-word quote from the transcript to prove grounding.
 - Do not repeat the same point across sections or within a section.
 - If a section has nothing, write exactly: None found.
 - Output the three sections and nothing else: no introduction, no closing remarks, no extra headers.
@@ -32,9 +33,20 @@ Global rules:
 
 SECTIONS = [
     ("action_items",   "ACTION ITEMS",   "No action items found."),
-    ("key_decisions",  "KEY TAKEAWAYS",  "No key takeaways found."),
+    ("key_decisions",  "HIGHLIGHTS",     "No highlights found."),
     ("open_questions", "OPEN QUESTIONS", "No open questions found."),
 ]
+
+
+def is_empty_section(text: str) -> bool:
+    if not text or not text.strip():
+        return True
+    t = text.strip().lower()
+    return (
+        t in ("none", "none.", "none found", "none found.", "no action items found.", "no highlights found.", "no open questions found.")
+        or re.match(r"^no\s+(?:highlights|questions|action\s+items|items)?\s*found\.?$", t) is not None
+        or re.match(r"^none\s*found\.?$", t) is not None
+    )
 
 
 def get_llm(temperature=0.0):
@@ -74,7 +86,8 @@ def _parse_sections(text: str) -> dict:
     header = r"^[ \t]*(?:#{{1,6}}[ \t]*)?\**[ \t]*{name}[ \t]*\**[ \t]*:?[ \t]*\**[ \t]*$"
     positions = []
     for key, name, _ in SECTIONS:
-        m = re.search(header.format(name=re.escape(name)), text, re.IGNORECASE | re.MULTILINE)
+        pattern_name = f"(?:{re.escape(name)}|KEY TAKEAWAYS)" if key == "key_decisions" else re.escape(name)
+        m = re.search(header.format(name=pattern_name), text, re.IGNORECASE | re.MULTILINE)
         if m:
             positions.append((m.start(), m.end(), key))
     positions.sort()
@@ -87,8 +100,7 @@ def _parse_sections(text: str) -> dict:
     result = {}
     for key, _, default in SECTIONS:
         content = out.get(key, "")
-        #treat as empty if "none found" 
-        if not content or re.fullmatch(r"[\W_]*none found\.?[\W_]*", content, re.IGNORECASE):
+        if is_empty_section(content):
             content = default
         result[key] = content
 
@@ -112,12 +124,19 @@ def _extract_once(text: str) -> dict:
 def _merge_lines(blocks: list, default: str) -> str:
     seen, lines = set(), []
     for block in blocks:
-        if block == default:
+        if is_empty_section(block):
             continue
         for line in block.splitlines():
-            clean = re.sub(r"^\s*\d+[\.\)]\s*", "", line).strip()   # strip numbering
-            if clean and clean.lower() not in seen:
-                seen.add(clean.lower())
+            line = line.strip()
+            if not line or is_empty_section(line):
+                continue
+            clean = re.sub(r"^\s*(\*{0,2}\d+[\.\)]\*{0,2}|-|\*)\s*", "", line).strip()
+            if not clean:
+                continue
+            # Deduplicate by primary claim (before the first pipe), case-insensitive
+            claim_key = clean.split("|")[0].strip().lower() if "|" in clean else clean.lower()
+            if claim_key and claim_key not in seen:
+                seen.add(claim_key)
                 lines.append(clean)
     return "\n".join(f"{i}. {l}" for i, l in enumerate(lines, 1)) or default
 

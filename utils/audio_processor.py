@@ -59,24 +59,30 @@ def get_youtube_transcript(url: str) -> str:
             # 3. Fallback: Any remaining auto-captions
             candidates = []
             for l in ["en", "en-US", "en-GB", "hi"]:
-                if l in subs:
+                if l in subs and "chat" not in l.lower():
                     candidates.append((l, subs[l]))
             for l, fmts in subs.items():
-                if (l, fmts) not in candidates:
+                if "chat" not in l.lower() and (l, fmts) not in candidates:
                     candidates.append((l, fmts))
 
             for l, fmts in auto.items():
+                if "chat" in l.lower():
+                    continue
                 is_translated = any("tlang=" in f.get("url", "") for f in fmts)
                 if not is_translated:
                     candidates.insert(0 if l in ["en", "hi"] else len(candidates), (l, fmts))
 
             for l in ["en", "hi"]:
-                if l in auto and (l, auto[l]) not in candidates:
+                if l in auto and "chat" not in l.lower() and (l, auto[l]) not in candidates:
                     candidates.append((l, auto[l]))
 
             for lang_code, formats in candidates:
+                if "chat" in lang_code.lower():
+                    continue
                 json_fmt = next((f for f in formats if f.get("ext") == "json3"), formats[0] if formats else None)
                 if not json_fmt or "url" not in json_fmt:
+                    continue
+                if "live_chat" in json_fmt.get("url", ""):
                     continue
 
                 try:

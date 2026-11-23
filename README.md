@@ -9,7 +9,7 @@
 The application processes video or audio input through a multi-stage pipeline:
 1. **Input Acquisition & Processing**: YouTube input uses caption extraction via mobile player clients, with file upload (Whisper/Sarvam) for videos without captions. Local uploads (`.mp4`, `.mp3`, `.wav`, etc.) are standardized into 16 kHz mono WAV chunks using `pydub` and FFmpeg.
 2. **Speech-to-Text**: For uploaded files or audio fallbacks, transcribes audio using either Groq Cloud's `whisper-large-v3` (with chunking and backoff retries) or Sarvam AI (`saaras:v2.5` for Hindi/Hinglish speech-to-text translation).
-3. **Structured Intelligence Extraction**: Generates an executive summary, action items table (with assignees and deadlines), key takeaways, open questions, and a video title in a single pass.
+3. **Structured Intelligence Extraction**: Generates an executive summary, action items table (with assignees and deadlines), highlights, open questions, and a video title in a single pass.
 4. **Interactive RAG Chat**: Indexes transcript chunks into an ephemeral, in-memory ChromaDB vector store using HuggingFace embeddings (`all-MiniLM-L6-v2`) and answers questions via LangChain LCEL with token streaming.
 
 ---
@@ -118,7 +118,7 @@ streamlit run app.py
 1. Choose the input source (YouTube URL or local file upload).
 2. Select the transcription engine (English / Global or Hinglish / Hindi).
 3. Click **Run analysis**.
-4. View structured tabs for the summary, action items table, takeaways, and full transcript.
+4. View structured tabs for the summary, action items table, highlights, and full transcript.
 5. Use the chat section below to query the video transcript with streaming responses.
 
 ### Command-Line Interface (CLI)

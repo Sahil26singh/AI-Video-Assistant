@@ -4,6 +4,7 @@ from core.transcriber import transcribe_all
 from core.summarizer import summarize, generate_title
 from core.extractor import extract_all
 from core.rag_engine import build_rag_chain, ask_question
+from core.verifier import verify_extraction
 
 load_dotenv()
 
@@ -24,6 +25,7 @@ def run_pipeline(source :str, language :str = "english") -> dict:
     decisions = extracted["key_decisions"]
     questions = extracted["open_questions"]
     
+    verification = verify_extraction(extracted, transcript)
     rag_chain = build_rag_chain(transcript)
 
     return {
@@ -34,6 +36,7 @@ def run_pipeline(source :str, language :str = "english") -> dict:
         "key_decisions": decisions,
         "open_questions": questions,
         "rag_chain": rag_chain,
+        "verification": verification,
     }
 
 if __name__ == "__main__":
@@ -42,11 +45,15 @@ if __name__ == "__main__":
     language = input("Language (english/hinglish): ").strip() or "english"
     result = run_pipeline(source, language)
 
+    ver = result.get("verification", {})
+    score = ver.get("grounding_score", 100.0)
+
     print("\n" + "=" * 60)
     print(f"Title: {result['title']}")
+    print(f"Groundedness Score: {score}% ({ver.get('verified_claims', 0)}/{ver.get('total_claims', 0)} claims verified with quotes)")
     print(f"\nSummary:\n{result['summary']}")
     print(f"\nAction Items:\n{result['action_items']}")
-    print(f"\nKey Takeaways:\n{result['key_decisions']}")
+    print(f"\nHighlights:\n{result['key_decisions']}")
     print(f"\nOpen Questions:\n{result['open_questions']}")
     print("=" * 60)
 

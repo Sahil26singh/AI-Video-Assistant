@@ -25,14 +25,21 @@ def get_llm(temperature=0.3):
         timeout=120,
     )
 
+MAX_CHUNK_CHARS = 15_000
+
 def split_transcript(transcript: str) -> list:
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=3000,
-        chunk_overlap=200,
+        chunk_size=MAX_CHUNK_CHARS,
+        chunk_overlap=500,
         separators=["\n\n", "\n", ". ", "? ", "! ", "; ", " ", ""],
         keep_separator="end",
     )
-    return splitter.split_text(transcript)
+    chunks = splitter.split_text(transcript)
+    # Safety cap: never exceed 12 chunks to avoid rate limit storms
+    if len(chunks) > 12:
+        step = max(1, len(chunks) // 12)
+        chunks = chunks[::step][:12]
+    return chunks
 
 def safe_invoke(chain, input_data, retries=5, delay=3):
     """Invoke chain with explicit exponential backoff for rate limits."""
@@ -52,6 +59,20 @@ def safe_invoke(chain, input_data, retries=5, delay=3):
 def summarize(transcript: str) -> str:
     llm = get_llm()
 
+    # Fast single-call summary for short and medium transcripts
+    if len(transcript) <= MAX_CHUNK_CHARS:
+        single_prompt = ChatPromptTemplate.from_messages([
+            (
+                "system",
+                "You are an expert video content summarizer. Produce a clear, professional "
+                "executive summary of this video transcript in structured bullet points.",
+            ),
+            ("human", "{text}"),
+        ])
+        chain = single_prompt | llm | StrOutputParser()
+        return safe_invoke(chain, {"text": transcript})
+
+    # Map-Reduce for longer recordings
     map_prompt = ChatPromptTemplate.from_messages([
         ("system", "Summarize this portion of the video transcript concisely."),
         ("human", "{text}"),
@@ -66,6 +87,9 @@ def summarize(transcript: str) -> str:
             time.sleep(2)
         summary_piece = safe_invoke(map_chain, {"text": chunk})
         chunk_summaries.append(summary_piece)
+
+    if len(chunk_summaries) == 1:
+        return chunk_summaries[0]
 
     combined = "\n\n".join(chunk_summaries)
 

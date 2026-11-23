@@ -12,6 +12,7 @@ from core.transcriber import transcribe_all
 from core.summarizer import summarize, generate_title
 from core.extractor import extract_all
 from core.rag_engine import build_rag_chain, ask_question
+from core.verifier import verify_extraction, is_quote_grounded
 
 load_dotenv()
 
@@ -20,7 +21,7 @@ FAVICON, LOGO = os.path.join(ASSETS, "favicon.png"), os.path.join(ASSETS, "logo.
 
 st.set_page_config(
     page_title="AI Video Assistant",
-    page_icon=FAVICON if os.path.exists(FAVICON) else "🎬",
+    page_icon=FAVICON if os.path.exists(FAVICON) else ":material/movie:",
     layout="wide",
 )
 
@@ -165,19 +166,85 @@ def looks_non_english(text, threshold=0.12):
     return len(letters) >= 80 and sum(bool(NON_LATIN.match(c)) for c in letters) / len(letters) > threshold
 
 
-def actions_to_df(text):
-    """Parse 'task | owner | deadline' lines into a DataFrame."""
+def actions_to_df(text, transcript=""):
+    """Parse 'task | owner | deadline | quote' lines into a DataFrame with verification status."""
     rows = []
     for line in text.splitlines():
         line = line.strip()
-        if not line or "none found" in line.lower() or "no action items" in line.lower():
+        if not line or is_empty_section(line):
             continue
-        p = [x.strip() for x in re.sub(r"^\s*(\d+[.)]|-|\*)\s*", "", line).split("|")]
+        clean = re.sub(r"^\s*(\*{0,2}\d+[.)]\*{0,2}|-|\*)\s*", "", line)
+        p = [x.strip() for x in clean.split("|")]
         if p[0]:
-            rows.append({"Task": p[0],
-                         "Owner": p[1] if len(p) > 1 else "Viewer",
-                         "Deadline": p[2] if len(p) > 2 else "Not specified"})
+            task = p[0].strip().strip("*").strip()
+            owner = p[1].strip().strip("*").strip() if len(p) > 1 else "Viewer"
+            deadline = p[2].strip().strip("*").strip() if len(p) > 2 else "Not specified"
+            quote = " | ".join(p[3:]).strip().strip('"\'“”‘’') if len(p) > 3 else ""
+
+            if quote and transcript:
+                is_valid = is_quote_grounded(quote, transcript)
+                status = "Verified" if is_valid else "Unverified"
+            else:
+                status = "—"
+
+            rows.append({
+                "Task": task,
+                "Owner": owner,
+                "Deadline": deadline,
+                "Evidence (Quote)": f'"{quote}"' if quote else "No direct quote",
+                "Grounding": status,
+            })
     return pd.DataFrame(rows)
+
+
+def is_empty_section(text: str) -> bool:
+    if not text or not text.strip():
+        return True
+    t = text.strip().lower()
+    return (
+        t in ("none found", "none found.", "no action items found.", "no highlights found.", "no open questions found.")
+        or re.match(r"^no\s+(?:highlights|questions|action\s+items|items)?\s*found\.?$", t) is not None
+    )
+
+
+def format_grounded_text(text: str, transcript: str = "") -> str:
+    """Format bullet points with quotes and grounding verification."""
+    if is_empty_section(text):
+        return text
+
+    formatted_lines = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        m = re.match(r"^\s*(\*{0,2}\d+[.)]\*{0,2}|-|\*)\s*(.*)", line)
+        prefix = m.group(1).replace("*", "") if m else "•"
+        body = m.group(2) if m else line
+
+        parts = [p.strip() for p in body.split("|")]
+        if len(parts) >= 2:
+            claim = parts[0].strip().strip("*").strip()
+            quote = " | ".join(parts[1:]).strip().strip('"\'“”')
+            is_valid = is_quote_grounded(quote, transcript) if transcript and quote else False
+            status_icon = ":material/check_circle:" if is_valid else ":material/help:"
+            status_text = "Verified in Video" if is_valid else "Unverified"
+            formatted_lines.append(
+                f"{prefix} **{claim}**\n   > :material/format_quote: *Evidence: \"{quote}\"* &nbsp;·&nbsp; {status_icon} *{status_text}*"
+            )
+        else:
+            quote_match = re.search(r'^(.*?)\s*[-:]?\s*["“](.+?)["”]\s*$', body)
+            if quote_match and len(quote_match.group(1).strip()) > 3:
+                claim = quote_match.group(1).strip().strip("*").strip()
+                quote = quote_match.group(2).strip().strip('"\'“”')
+                is_valid = is_quote_grounded(quote, transcript) if transcript and quote else False
+                status_icon = ":material/check_circle:" if is_valid else ":material/help:"
+                status_text = "Verified in Video" if is_valid else "Unverified"
+                formatted_lines.append(
+                    f"{prefix} **{claim}**\n   > :material/format_quote: *Evidence: \"{quote}\"* &nbsp;·&nbsp; {status_icon} *{status_text}*"
+                )
+            else:
+                formatted_lines.append(f"{prefix} {body}")
+    return "\n\n".join(formatted_lines)
 
 
 def run_audio_pipeline(source_path: str, lang: str):
@@ -217,7 +284,7 @@ with st.sidebar:
     else:
         uploaded = st.file_uploader("Audio / video file", help="Choose a file (audio/video) from your Device.",
                                     type=["mp3", "wav", "mp4", "m4a", "mkv", "webm", "aac", "ogg", "flac"])
-        st.caption("**Tip:** Audio (`.mp3`, `.m4a`) finishes faster than video.")
+        st.caption(":material/speed: **Tip:** Audio (`.mp3`, `.m4a`) finishes faster than video.")
 
     banner("2. Transcription engine")
     language = st.radio(
@@ -293,9 +360,10 @@ if run:
                 st.markdown(":material/title: **Step 3/5 · Title** — generating video title")
                 title = generate_title(transcript)
 
-                st.markdown(":material/summarize: **Step 4/5 · Content extraction** — summary & key takeaways")
+                st.markdown(":material/summarize: **Step 4/5 · Content extraction** — summary & highlights")
                 summary = summarize(transcript)
                 ex = extract_all(transcript)
+                verification = verify_extraction(ex, transcript)
 
                 st.markdown(":material/hub: **Step 5/5 · Knowledge indexing** — building ChromaDB embeddings")
                 rag_chain = build_rag_chain(transcript)
@@ -307,6 +375,7 @@ if run:
                 "open_questions": ex["open_questions"], "rag_chain": rag_chain,
                 "chunks": chunks_count, "duration": duration, "language": language,
                 "mode": mode,
+                "verification": verification,
             }
             st.toast("Analysis complete", icon=":material/check_circle:")
             st.rerun()
@@ -345,26 +414,27 @@ if not r:
     st.stop()
 
 # ─── Results ────────────────────────────────────────────────────────────────────
-if r.get("mode") == "captions" and r["language"] == "hinglish":
-    st.info(
-        "Direct YouTube captions were loaded. Sarvam AI's speech translation runs on uploaded audio tracks; "
-        "to translate spoken Hindi/Hinglish directly from audio with Sarvam, download the audio and use **Upload File** in the sidebar.",
-        icon=":material/info:"
-    )
-elif r["language"] == "english" and looks_non_english(r["transcript"]):
-    if r.get("mode") == "captions":
+if r:
+    if r.get("mode") == "captions" and r["language"] == "hinglish":
         st.info(
-            "**Hindi / Devanagari text detected in YouTube transcript.** "
-            "YouTube provided native Hindi subtitles. If you want spoken Hindi translated to English audio text, "
-            "download the audio file and upload it with the **'Hinglish / Hindi (Sarvam AI)'** engine.",
+            "Direct YouTube captions were loaded. Sarvam AI's speech translation runs on uploaded audio tracks; "
+            "to translate spoken Hindi/Hinglish directly from audio with Sarvam, download the audio and use **Upload File** in the sidebar.",
             icon=":material/info:"
         )
-    else:
-        st.warning(
-            "High proportion of non-Latin characters detected. If this is Hindi/Hinglish audio, "
-            "re-run with 'Hinglish / Hindi (Sarvam AI)' for better accuracy.",
-            icon=":material/warning:"
-        )
+    elif r["language"] == "english" and looks_non_english(r["transcript"]):
+        if r.get("mode") == "captions":
+            st.info(
+                "**Hindi / Devanagari text detected in YouTube transcript.** "
+                "YouTube provided native Hindi subtitles. If you want spoken Hindi translated to English audio text, "
+                "download the audio file and upload it with the **'Hinglish / Hindi (Sarvam AI)'** engine.",
+                icon=":material/info:"
+            )
+        else:
+            st.warning(
+                "High proportion of non-Latin characters detected. If this is Hindi/Hinglish audio, "
+                "re-run with 'Hinglish / Hindi (Sarvam AI)' for better accuracy.",
+                icon=":material/warning:"
+            )
 
 with st.container(border=True):
     banner("Session title")
@@ -383,35 +453,61 @@ else:
     m4.metric("Duration", fmt_duration(r["duration"]))
 st.write("")
 
+ver = r.get("verification")
+if ver and ver.get("total_claims", 0) > 0:
+    score = ver.get("grounding_score", 100.0)
+    total = ver.get("total_claims", 0)
+    verified = ver.get("verified_claims", 0)
+
+    with st.container(border=True):
+        c_score, c_info = st.columns([1, 2], vertical_alignment="center")
+        with c_score:
+            if score >= 80:
+                st.markdown(f"### :material/verified_user: Groundedness: :green[{score}%]")
+                st.caption(f":material/check_circle: **{verified}/{total} claims** verified with transcript quotes")
+            elif score >= 50:
+                st.markdown(f"### :material/shield: Groundedness: :orange[{score}%]")
+                st.caption(f":material/warning: **{verified}/{total} claims** verified with transcript quotes")
+            else:
+                st.markdown(f"### :material/shield: Groundedness: :red[{score}%]")
+                st.caption(f":material/error: **{verified}/{total} claims** verified with transcript quotes")
+        with c_info:
+            st.markdown(
+                "**:material/fact_check: Fact-Check & Attribution Check:** Every extracted task, highlight, and question "
+                "is cross-referenced with exact transcript quotes to guard against LLM hallucinations."
+            )
+
 t_sum, t_act, t_key, t_q, t_tr = st.tabs(
-    ["Summary", "Action items", "Key takeaways", "Questions & follow-ups", "Transcript & export"])
+    ["Summary", "Action items", "Highlights", "Questions & follow-ups", "Transcript & export"])
 
 with t_sum:
     card("Executive summary", r["summary"])
 
 with t_act:
-    df = actions_to_df(r["action_items"])
+    df = actions_to_df(r["action_items"], r.get("transcript", ""))
     if df.empty:
         card("Action items & task owners", r["action_items"])
     else:
         with st.container(border=True):
-            banner("Action items & task owners")
+            banner("Action items & task owners", "Tasks cross-referenced with exact transcript quotes")
             st.dataframe(df, hide_index=True, width="stretch")
 
 with t_key:
-    card("Key takeaways", r["key_decisions"])
+    card("Highlights", format_grounded_text(r["key_decisions"], r.get("transcript", "")))
 
 with t_q:
-    card("Questions & follow-ups", r["open_questions"])
+    card("Questions & follow-ups", format_grounded_text(r["open_questions"], r.get("transcript", "")))
 
 with t_tr:
     with st.container(border=True):
         banner("Full transcript")
         st.container(height=400).text(r["transcript"])
+    grounded_highlights = format_grounded_text(r["key_decisions"], r.get("transcript", ""))
+    grounded_questions = format_grounded_text(r["open_questions"], r.get("transcript", ""))
     report = (
         f"# {r['title']}\n\nGenerated by AI Video Assistant\nSource: {st.session_state.source}\n\n---\n\n"
         f"## Executive summary\n{r['summary']}\n\n---\n\n## Action items & task owners\n{r['action_items']}\n\n---\n\n"
-        f"## Key takeaways\n{r['key_decisions']}\n\n---\n\n## Questions & follow-ups\n{r['open_questions']}\n\n---\n\n"
+        f"## Highlights\n{grounded_highlights}\n\n---\n\n## Questions & follow-ups\n{grounded_questions}\n\n---\n\n"
         f"## Full transcript\n{r['transcript']}\n"
     )
     d1, d2, _ = st.columns([2, 2, 4])
@@ -427,7 +523,7 @@ with st.container(border=True):
            "Ask questions, explore specific points, or request further synthesis from the transcript")
 
     suggestions = {
-        "Key takeaways": "What were the key takeaways from this video?",
+        "Highlights": "What were the main highlights of this video?",
         "3-bullet summary": "Provide a concise 3-bullet executive overview of the video.",
         "Unanswered questions": "What questions or issues remained unresolved or need follow-up?",
     }
