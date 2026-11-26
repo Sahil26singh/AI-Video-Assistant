@@ -3,6 +3,10 @@ import shutil
 import glob
 import subprocess
 import wave
+import re
+import tempfile
+import requests
+import yt_dlp
 
 # Ensure ffmpeg path is available to yt-dlp and ffmpeg subprocesses
 if not shutil.which("ffmpeg"):
@@ -13,25 +17,39 @@ if not shutil.which("ffmpeg"):
             os.environ["PATH"] = path + os.path.pathsep + os.environ.get("PATH", "")
             break
 
-import yt_dlp
-import tempfile
+# Non-Latin character range check (Arabic, Devanagari, Cyrillic, Bengali, CJK, etc.)
+NON_LATIN = re.compile(r"[\u0600-\u06FF\u0900-\u097F\u0400-\u04FF\u0980-\u09FF\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]")
+
+def looks_non_english(text: str, threshold: float = 0.12) -> bool:
+    letters = [c for c in text if c.isalpha()]
+    return len(letters) >= 30 and sum(bool(NON_LATIN.match(c)) for c in letters) / len(letters) > threshold
+
+def is_matching_lang(code: str, target_lang: str) -> bool:
+    c = code.lower()
+    if "chat" in c:
+        return False
+    if target_lang == "hinglish":
+        return c.startswith("hi") or c.startswith("en")
+    return c.startswith("en")
 
 DOWNLOAD_DIR = 'downloads'
 
 def extract_video_id(url: str) -> str:
-    import re
     match = re.search(r"(?:v=|youtu\.be/|shorts/)([A-Za-z0-9_-]{11})", url)
     return match.group(1) if match else ""
 
 
-def get_youtube_transcript(url: str) -> str:
+def get_youtube_transcript(url: str, language: str = "english") -> str:
     """
     Fetch YouTube transcripts directly via yt-dlp mobile client simulation.
     Bypasses datacenter/cloud IP blocks (AWS, Streamlit Cloud) without needing third-party scrapers.
+    Filters transcripts to match the requested language (e.g. 'english' or 'hinglish').
     """
     video_id = extract_video_id(url)
     if not video_id:
         return ""
+
+    target = (language or "english").lower().strip()
 
     ydl_opts = {
         "skip_download": True,
@@ -44,8 +62,6 @@ def get_youtube_transcript(url: str) -> str:
         "no_warnings": True,
     }
     try:
-        import requests
-
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             subs = info.get("subtitles") or {}
@@ -53,31 +69,56 @@ def get_youtube_transcript(url: str) -> str:
             if not subs and not auto:
                 return ""
 
-            # Candidate tracks in priority order:
-            # 1. Manual human subtitles (matching en or hi first, then any other)
-            # 2. Native auto-captions (where YouTube hasn't auto-translated with 'tlang=')
-            # 3. Fallback: Any remaining auto-captions
+            # Candidate tracks in priority order for the requested target language:
+            # 1. Manual human subtitles matching the target language
+            # 2. Native auto-captions (where YouTube hasn't auto-translated with 'tlang=') matching target language
+            # 3. Fallback: Any remaining auto-captions matching target language
             candidates = []
-            for l in ["en", "en-US", "en-GB", "hi"]:
-                if l in subs and "chat" not in l.lower():
-                    candidates.append((l, subs[l]))
-            for l, fmts in subs.items():
-                if "chat" not in l.lower() and (l, fmts) not in candidates:
-                    candidates.append((l, fmts))
 
-            for l, fmts in auto.items():
-                if "chat" in l.lower():
-                    continue
-                is_translated = any("tlang=" in f.get("url", "") for f in fmts)
-                if not is_translated:
-                    candidates.insert(0 if l in ["en", "hi"] else len(candidates), (l, fmts))
+            if target == "hinglish":
+                # Prefer Hindi subtitles first, then English
+                for lang_pref in [["hi", "hi-Latn"], ["en", "en-US", "en-GB"]]:
+                    for l in lang_pref:
+                        if l in subs and is_matching_lang(l, target):
+                            candidates.append((l, subs[l]))
+                for l, fmts in subs.items():
+                    if is_matching_lang(l, target) and not any(c[0] == l for c in candidates):
+                        candidates.append((l, fmts))
 
-            for l in ["en", "hi"]:
-                if l in auto and "chat" not in l.lower() and (l, auto[l]) not in candidates:
-                    candidates.append((l, auto[l]))
+                for l, fmts in auto.items():
+                    if not is_matching_lang(l, target):
+                        continue
+                    is_translated = any("tlang=" in f.get("url", "") for f in fmts)
+                    if not is_translated and not any(c[0] == l for c in candidates):
+                        if l.startswith("hi"):
+                            candidates.insert(0, (l, fmts))
+                        else:
+                            candidates.append((l, fmts))
+                for l, fmts in auto.items():
+                    if is_matching_lang(l, target) and not any(c[0] == l for c in candidates):
+                        candidates.append((l, fmts))
+            else:
+                # Default: English
+                for l in ["en", "en-US", "en-GB", "en-CA", "en-AU"]:
+                    if l in subs and is_matching_lang(l, target):
+                        candidates.append((l, subs[l]))
+                for l, fmts in subs.items():
+                    if is_matching_lang(l, target) and not any(c[0] == l for c in candidates):
+                        candidates.append((l, fmts))
+
+                for l, fmts in auto.items():
+                    if not is_matching_lang(l, target):
+                        continue
+                    is_translated = any("tlang=" in f.get("url", "") for f in fmts)
+                    if not is_translated and not any(c[0] == l for c in candidates):
+                        candidates.insert(0 if l in ["en", "en-US"] else len(candidates), (l, fmts))
+
+                for l, fmts in auto.items():
+                    if is_matching_lang(l, target) and not any(c[0] == l for c in candidates):
+                        candidates.append((l, fmts))
 
             for lang_code, formats in candidates:
-                if "chat" in lang_code.lower():
+                if not is_matching_lang(lang_code, target):
                     continue
                 json_fmt = next((f for f in formats if f.get("ext") == "json3"), formats[0] if formats else None)
                 if not json_fmt or "url" not in json_fmt:
@@ -90,6 +131,7 @@ def get_youtube_transcript(url: str) -> str:
                     if resp.status_code != 200:
                         continue
 
+                    text = ""
                     if json_fmt.get("ext") == "json3":
                         data = resp.json()
                         lines = []
@@ -99,17 +141,19 @@ def get_youtube_transcript(url: str) -> str:
                                 if t and t != "\n":
                                     lines.append(t)
                         text = " ".join(lines).strip()
-                        if text:
-                            print(f"[Transcript API] Successfully fetched direct transcript in '{lang_code}' ({len(text)} chars).")
-                            return text
                     elif resp.text:
-                        import re
                         cleaned = re.sub(r"<[^>]+>", " ", resp.text)
                         cleaned = re.sub(r"\d{2}:\d{2}:\d{2}[.,]\d+ --> \d{2}:\d{2}:\d{2}[.,]\d+", " ", cleaned)
                         text = " ".join(cleaned.split()).strip()
-                        if text:
-                            print(f"[Transcript API] Successfully parsed caption stream in '{lang_code}' ({len(text)} chars).")
-                            return text
+
+                    if text:
+                        # Safety check: If user requested English, ensure captions are not predominantly non-English
+                        if target == "english" and looks_non_english(text):
+                            print(f"[Transcript API] Rejected transcript in '{lang_code}': contains non-English characters.")
+                            continue
+
+                        print(f"[Transcript API] Successfully fetched direct transcript in '{lang_code}' ({len(text)} chars).")
+                        return text
                 except Exception:
                     continue
     except Exception as e:
