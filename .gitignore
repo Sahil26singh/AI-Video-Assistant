@@ -9,8 +9,10 @@ core/__pycache__/
 utils/__pycache__/
 
 # Local Data & Media
+downloads/
 downloades/
 vector_db/
+cookies.txt
 
 # IDE
 .vscode/

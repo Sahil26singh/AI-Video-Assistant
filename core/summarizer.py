@@ -35,10 +35,10 @@ def split_transcript(transcript: str) -> list:
         keep_separator="end",
     )
     chunks = splitter.split_text(transcript)
-    # Safety cap: never exceed 12 chunks to avoid rate limit storms
+    # Cap API calls at 12 without dropping any content by grouping neighbouring chunks
     if len(chunks) > 12:
-        step = max(1, len(chunks) // 12)
-        chunks = chunks[::step][:12]
+        size = -(-len(chunks) // 12)  # ceiling division
+        chunks = ["\n\n".join(chunks[i:i + size]) for i in range(0, len(chunks), size)]
     return chunks
 
 def safe_invoke(chain, input_data, retries=5, delay=3):

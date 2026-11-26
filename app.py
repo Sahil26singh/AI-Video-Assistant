@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 
-from utils.audio_processor import process_input, get_youtube_transcript
+from utils.audio_processor import process_input, get_youtube_transcript, cleanup_temp_files
 from core.transcriber import transcribe_all
 from core.summarizer import summarize, generate_title
 from core.extractor import extract_all
@@ -257,7 +257,10 @@ def run_audio_pipeline(source_path: str, lang: str):
         prog.markdown(f":material/transcribe: **Step 2/5 · Transcription** — chunk {cur} of {total} via {lang.capitalize()}")
 
     on_progress(1, len(chunks))
-    text = transcribe_all(chunks, lang, on_progress=on_progress)
+    try:
+        text = transcribe_all(chunks, lang, on_progress=on_progress)
+    finally:
+        cleanup_temp_files(chunks)
     return text, len(chunks), duration_sec
 
 
@@ -329,7 +332,7 @@ if run:
                 # 1. Fast track: Attempt direct YouTube transcript first (bypasses 403 Forbidden & quotas)
                 if source_type == "YouTube URL":
                     st.markdown(":material/subtitles: Checking for native YouTube transcript...")
-                    direct_transcript = get_youtube_transcript(target)
+                    direct_transcript = get_youtube_transcript(target, language=language)
                     if direct_transcript:
                         transcript = direct_transcript
                         chunks_count = 1

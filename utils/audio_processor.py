@@ -14,9 +14,9 @@ if not shutil.which("ffmpeg"):
             break
 
 import yt_dlp
+import tempfile
 
-DOWNLOAD_DIR = 'downloades'
-os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+DOWNLOAD_DIR = 'downloads'
 
 def extract_video_id(url: str) -> str:
     import re
@@ -117,8 +117,10 @@ def get_youtube_transcript(url: str) -> str:
     return ""
 
 
-def download_youtube_audio(url: str) -> str:
-    output_template = os.path.join(DOWNLOAD_DIR, "%(id)s.%(ext)s")
+def download_youtube_audio(url: str, output_dir: str = None) -> str:
+    target_dir = output_dir or DOWNLOAD_DIR
+    os.makedirs(target_dir, exist_ok=True)
+    output_template = os.path.join(target_dir, "%(id)s.%(ext)s")
     
     ffmpeg_exe = shutil.which("ffmpeg")
     ffmpeg_dir = os.path.dirname(ffmpeg_exe) if ffmpeg_exe else None
@@ -151,7 +153,7 @@ def download_youtube_audio(url: str) -> str:
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         video_id = info.get("id", "audio")
-        expected_wav = os.path.join(DOWNLOAD_DIR, f"{video_id}.wav")
+        expected_wav = os.path.join(target_dir, f"{video_id}.wav")
 
         if os.path.exists(expected_wav):
             return expected_wav
@@ -160,12 +162,20 @@ def download_youtube_audio(url: str) -> str:
         raw_name = ydl.prepare_filename(info)
         base, _ = os.path.splitext(raw_name)
         wav_name = base + ".wav"
-        return wav_name
+        if os.path.exists(wav_name):
+            return wav_name
+        return expected_wav
 
 
-def convert_to_wav(input_path: str) -> str:
+def convert_to_wav(input_path: str, output_dir: str = None) -> str:
     """Convert any audio/video file to 16kHz mono WAV format using FFmpeg directly (low RAM streaming)."""
-    output_path = os.path.splitext(input_path)[0] + "_converted.wav"
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+        base_name = os.path.splitext(os.path.basename(input_path))[0]
+        output_path = os.path.join(output_dir, f"{base_name}_converted.wav")
+    else:
+        output_path = os.path.splitext(input_path)[0] + "_converted.wav"
+
     ffmpeg = shutil.which("ffmpeg") or "ffmpeg"
     cmd = [
         ffmpeg, "-y", "-i", input_path,
@@ -179,11 +189,19 @@ def convert_to_wav(input_path: str) -> str:
     return output_path
 
 
-def chunk_audio(wav_path: str, chunk_minutes: int = 8) -> tuple:
+def chunk_audio(wav_path: str, chunk_minutes: int = 8, output_dir: str = None) -> tuple:
     """Split WAV audio into chunks using FFmpeg segmenter without loading data into RAM."""
     chunk_seconds = chunk_minutes * 60
-    base = os.path.splitext(wav_path)[0]
-    output_pattern = f"{base}_chunk_%03d.wav"
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+        base_name = os.path.splitext(os.path.basename(wav_path))[0]
+        output_pattern = os.path.join(output_dir, f"{base_name}_chunk_%03d.wav")
+        search_pattern = os.path.join(output_dir, f"{base_name}_chunk_[0-9][0-9][0-9].wav")
+    else:
+        base = os.path.splitext(wav_path)[0]
+        output_pattern = f"{base}_chunk_%03d.wav"
+        search_pattern = f"{base}_chunk_[0-9][0-9][0-9].wav"
+
     ffmpeg = shutil.which("ffmpeg") or "ffmpeg"
 
     # Segment the file on disk directly
@@ -196,7 +214,7 @@ def chunk_audio(wav_path: str, chunk_minutes: int = 8) -> tuple:
     ]
     subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    raw_chunks = sorted(glob.glob(f"{base}_chunk_[0-9][0-9][0-9].wav"))
+    raw_chunks = sorted(glob.glob(search_pattern))
 
     # Filter out empty or tiny trailing fraction chunks
     chunks = []
@@ -223,17 +241,69 @@ def chunk_audio(wav_path: str, chunk_minutes: int = 8) -> tuple:
     return chunks, total_duration_sec
 
 
-def process_input(source: str) -> tuple:
-    if source.startswith("http://") or source.startswith("https://"):
-        print("Detected YouTube URL. Downloading audio...")
-        raw_download = download_youtube_audio(source)
-        print("Converting audio to standard 16kHz mono WAV...")
-        wav_path = convert_to_wav(raw_download)
-    else:
-        print("Detected local file. Converting to 16kHz mono WAV...")
-        wav_path = convert_to_wav(source)
+def process_input(source: str, work_dir: str = None) -> tuple:
+    """
+    Process input audio/video (YouTube URL or local file path) into 16kHz mono WAV chunks.
+    All intermediate files (download, converted WAV, chunks) are placed in work_dir
+    (or an isolated temporary directory) to avoid cluttering the user's files or filling up disk.
+    """
+    temp_dir = work_dir or tempfile.mkdtemp(prefix="aivideo_")
+    os.makedirs(temp_dir, exist_ok=True)
 
-    print("Chunking audio...")
-    chunks, duration_sec = chunk_audio(wav_path, chunk_minutes=8)
-    print(f"Audio ready — {len(chunks)} chunk(s) created (duration: {duration_sec:.1f}s).")
-    return chunks, duration_sec
+    try:
+        if source.startswith("http://") or source.startswith("https://"):
+            print("Detected YouTube URL. Downloading audio...")
+            raw_download = download_youtube_audio(source, output_dir=temp_dir)
+            print("Converting audio to standard 16kHz mono WAV...")
+            wav_path = convert_to_wav(raw_download, output_dir=temp_dir)
+            # Remove intermediate raw download once converted to 16kHz WAV
+            if os.path.abspath(raw_download) != os.path.abspath(wav_path) and os.path.exists(raw_download):
+                try:
+                    os.remove(raw_download)
+                except OSError:
+                    pass
+        else:
+            print("Detected local file. Converting to 16kHz mono WAV in temp directory...")
+            wav_path = convert_to_wav(source, output_dir=temp_dir)
+
+        print("Chunking audio...")
+        chunks, duration_sec = chunk_audio(wav_path, chunk_minutes=8, output_dir=temp_dir)
+        print(f"Audio ready — {len(chunks)} chunk(s) created (duration: {duration_sec:.1f}s).")
+        return chunks, duration_sec
+    except Exception:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        raise
+
+
+def cleanup_temp_files(chunks: list = None, temp_dir: str = None) -> None:
+    """
+    Safely delete chunk files, intermediate WAVs, and any dedicated temporary directory
+    created during processing. Safe to call multiple times or when files are already removed.
+    """
+    dirs_to_remove = set()
+    if temp_dir and os.path.isdir(temp_dir):
+        dirs_to_remove.add(os.path.abspath(temp_dir))
+
+    if chunks:
+        for chunk in chunks:
+            if not chunk:
+                continue
+            parent = os.path.abspath(os.path.dirname(chunk))
+            base_dir = os.path.basename(parent)
+            # If the chunk is inside our designated temporary directory, collect it for removal
+            if "aivideo_" in base_dir or "vid_upload_" in base_dir:
+                dirs_to_remove.add(parent)
+            else:
+                try:
+                    if os.path.exists(chunk):
+                        os.remove(chunk)
+                except OSError:
+                    pass
+
+    for d in dirs_to_remove:
+        try:
+            if os.path.exists(d):
+                shutil.rmtree(d, ignore_errors=True)
+        except OSError:
+            pass
+

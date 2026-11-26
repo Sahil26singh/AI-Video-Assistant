@@ -3,6 +3,7 @@
 # ── Audio / Video Acquisition & Processing ────────────────────────────────────
 yt-dlp                            # Audio extraction & direct caption extraction (unpinned for rolling YouTube updates)
 pydub>=0.25.1                     # Audio file manipulation, chunking & format conversion
+audioop-lts; python_version >= "3.13" # Standard library audioop backport for Python 3.13+
 
 # ── Speech-to-Text (STT) ───────────────────────────────────────────────────────
 groq>=0.9.0                       # Groq Cloud Whisper Large v3 STT API client
@@ -26,7 +27,7 @@ torchvision                       # Required by transformers vision modules
 langchain-huggingface>=0.0.3      # LangChain HuggingFace embeddings bridge
 
 # ── Frontend Web UI ───────────────────────────────────────────────────────────
-streamlit>=1.35.0                 # Web application framework
+streamlit>=1.50.0                 # Web application framework (supports width="stretch" and native material icons)
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 python-dotenv>=1.0.0              # Environment variable management (.env)
